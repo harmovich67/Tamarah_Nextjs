@@ -1,0 +1,5 @@
+{
+  "login": "/admin/login",
+  "logout": "/admin/logout",
+  "bannerToggle": "/admin/banners/{0}/status"
+}

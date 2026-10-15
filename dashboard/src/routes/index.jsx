@@ -1,0 +1,82 @@
+import { lazy } from 'react';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import AdminLayout from '@/layouts/AdminLayout';
+import { RequireAuth, RequirePermission } from './guards';
+
+/** Every screen is a lazy chunk (code splitting); the guards enforce login + permission for UX. */
+const page = (loader) => lazy(loader);
+const Login = page(() => import('@/pages/Login'));
+const Dashboard = page(() => import('@/pages/Dashboard'));
+const Products = page(() => import('@/pages/products/ProductsPage'));
+const ProductForm = page(() => import('@/pages/products/ProductFormPage'));
+const Categories = page(() => import('@/pages/Categories'));
+const Warehouses = page(() => import('@/pages/Warehouses'));
+const Orders = page(() => import('@/pages/orders/OrdersPage'));
+const OrderDetail = page(() => import('@/pages/orders/OrderDetailPage'));
+const Coupons = page(() => import('@/pages/Coupons'));
+const ShippingZones = page(() => import('@/pages/ShippingZones'));
+const PaymentSettings = page(() => import('@/pages/settings/PaymentSettings'));
+const SiteSettings = page(() => import('@/pages/settings/SiteSettings'));
+const HomeSections = page(() => import('@/pages/home/HomeSections'));
+const Menus = page(() => import('@/pages/Menus'));
+const Pages = page(() => import('@/pages/cms/PagesPage'));
+const PageForm = page(() => import('@/pages/cms/PageFormPage'));
+const Posts = page(() => import('@/pages/cms/PostsPage'));
+const PostForm = page(() => import('@/pages/cms/PostFormPage'));
+const CustomFields = page(() => import('@/pages/cms/CustomFieldsPage'));
+const CustomFieldForm = page(() => import('@/pages/cms/CustomFieldFormPage'));
+const Users = page(() => import('@/pages/Users'));
+const Translations = page(() => import('@/pages/system/Translations'));
+const Cache = page(() => import('@/pages/system/Cache'));
+const Logs = page(() => import('@/pages/system/Logs'));
+const Security = page(() => import('@/pages/system/Security'));
+const Backup = page(() => import('@/pages/system/Backup'));
+const NotFound = page(() => import('@/pages/NotFound'));
+
+const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
+
+export const router = createBrowserRouter([
+  { path: '/login', element: <Login /> },
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: guard('dashboard.view', <Dashboard />) },
+          { path: 'products', element: guard('products.view', <Products />) },
+          { path: 'products/create', element: guard('products.create', <ProductForm />) },
+          { path: 'products/:id/edit', element: guard('products.edit', <ProductForm />) },
+          { path: 'categories', element: guard('categories.view', <Categories />) },
+          { path: 'warehouses', element: guard('warehouses.view', <Warehouses />) },
+          { path: 'orders', element: guard('orders.view', <Orders />) },
+          { path: 'orders/:id', element: guard('orders.view', <OrderDetail />) },
+          { path: 'coupons', element: guard('coupons.view', <Coupons />) },
+          { path: 'shipping-zones', element: guard('shipping.view', <ShippingZones />) },
+          { path: 'settings', element: guard('payments.view', <PaymentSettings />) },
+          { path: 'site-settings', element: guard('site_settings.view', <SiteSettings />) },
+          { path: 'home-sections', element: guard('home_sections.view', <HomeSections />) },
+          { path: 'menus', element: guard('menus.view', <Menus />) },
+          { path: 'pages', element: guard('pages.view', <Pages />) },
+          { path: 'pages/create', element: guard('pages.create', <PageForm />) },
+          { path: 'pages/:id/edit', element: guard('pages.edit', <PageForm />) },
+          { path: 'posts', element: guard('posts.view', <Posts />) },
+          { path: 'posts/create', element: guard('posts.create', <PostForm />) },
+          { path: 'posts/:id/edit', element: guard('posts.edit', <PostForm />) },
+          { path: 'custom-fields', element: guard('custom_fields.view', <CustomFields />) },
+          { path: 'custom-fields/create', element: guard('custom_fields.create', <CustomFieldForm />) },
+          { path: 'custom-fields/:id/edit', element: guard('custom_fields.edit', <CustomFieldForm />) },
+          { path: 'users', element: guard('users.view', <Users />) },
+          { path: 'translations', element: guard('translations.view', <Translations />) },
+          { path: 'cache', element: guard('cache.manage', <Cache />) },
+          { path: 'logs', element: guard('logs.view', <Logs />) },
+          { path: 'security', element: guard('security.view', <Security />) },
+          { path: 'backup', element: guard('backup.view', <Backup />) },
+          // Legacy PHP URL (/admin/shipping_zones etc. were hyphenated already; keep a friendly alias)
+          { path: 'admin/*', element: <Navigate to="/" replace /> },
+          { path: '*', element: <NotFound /> },
+        ],
+      },
+    ],
+  },
+]);

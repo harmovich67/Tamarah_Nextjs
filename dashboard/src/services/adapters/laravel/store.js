@@ -1,0 +1,258 @@
+import { apiClient as api } from '@/lib/apiClient';
+import { endpoints as e } from '../../endpoints';
+import { toFormData, unwrap } from './helpers';
+import { fetchAll, fetchAllBilingual, isOn, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
+
+/**
+ * Laravel adapter for the store-management domain (same function names / shapes as adapters/mock/store.js).
+ * Categories and products talk to the Tamrna backend (see ./tamrna.js for the field translation); the dashboard KPIs,
+ * warehouses and orders still follow docs/API_CONTRACT.md because the backend collection does not expose them yet.
+ */
+export const getDashboardStats = async () => unwrap(await api.get(e.dashboard));
+
+const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
+
+// -------------------------------------------------------------------------------------------- categories
+function toCategory(c) {
+  const name = txPair(c, 'name');
+  const description = txPair(c, 'description');
+  const image = mediaOf(c.image ?? c.media);
+  return {
+    id: c.id,
+    name_ar: name.ar,
+    name_en: name.en,
+    description_ar: tx(c, 'description', 'ar'),
+    description_en: tx(c, 'description', 'en'),
+    description: description.ar,
+    slug: tx(c, 'slug', 'en') || tx(c, 'slug', 'ar'),
+    icon: 'tag',
+    image: image?.url || '',
+    image_id: image?.id ?? null,
+    is_active: c.is_active === undefined ? true : isOn(c.is_active),
+    sort_order: c.sort_order ?? null,
+    products_count: c.products_count ?? null, // the list endpoint does not count products
+  };
+}
+
+export const listCategories = async () => (await fetchAllBilingual(e.categories.list)).map(toCategory);
+export const getCategory = async (id) => toCategory(unwrap(await api.get(e.categories.item(id))));
+
+async function categoryBody(values) {
+  const slugs = slugPair(values);
+  const name_en = (values.name_en || '').trim() || values.name_ar;
+  const body = {
+    en: { name: name_en, description: (values.description_en || '').trim(), slug: slugs.en },
+    ar: { name: values.name_ar, description: (values.description_ar || '').trim(), slug: slugs.ar },
+    is_active: values.is_active ?? true,
+  };
+  if (values.sort_order !== undefined && values.sort_order !== null && values.sort_order !== '') body.sort_order = values.sort_order;
+  if (values.image_file instanceof File) body.image = await uploadMedia(values.image_file, { model: 'Category', option: 'image' });
+  return body;
+}
+
+export const createCategory = (values) =>
+  withFormErrors(categoryBody(values).then((body) => api.post(e.categories.list, toFormData(body)).then((r) => toCategory(unwrap(r)))));
+// Laravel cannot read multipart bodies on PUT: send POST with _method=PUT.
+export const updateCategory = (id, values) =>
+  withFormErrors(categoryBody(values).then((body) => api.post(e.categories.item(id), toFormData({ ...body, _method: 'PUT' })).then((r) => toCategory(unwrap(r)))));
+export const deleteCategory = async (id) => api.delete(e.categories.item(id));
+export const toggleCategory = async (id) => unwrap(await api.post(e.categoryStatus(id)));
+/** @param {Record<string, number>} order category id -> position */
+export const sortCategories = async (order) => api.post(e.categorySortOrder, toFormData({ order }));
+
+// ---------------------------------------------------------------------------------------------- products
+const categoryIdsOf = (p) => p.category_ids ?? (p.categories ? p.categories.map((c) => c.id) : p.category_id ? [p.category_id] : []);
+
+/** Price after the variant discount (percentage or fixed amount). */
+function finalPrice(v) {
+  const base = Number(v.base_price ?? v.price ?? 0);
+  const value = Number(v.discount_value ?? 0);
+  if (!isOn(v.discount_active) || !(value > 0)) return base;
+  return Math.max(0, v.discount_type === 'percentage' ? base * (1 - value / 100) : base - value);
+}
+
+// The backend sends decimals as strings ("250.0000").
+const variantLabel = (v) => `${v.weight === undefined || v.weight === null ? '' : Number(v.weight)} ${v.weight_unit ?? ''}`.trim();
+
+/** A backend variant as a form row (price, weight + unit and the discount as a percentage). */
+function toVariantForm(v) {
+  const base = Number(v.base_price ?? v.price ?? 0);
+  const value = Number(v.discount_value ?? 0);
+  let discount = '';
+  if (value > 0) discount = v.discount_type === 'percentage' ? value : base > 0 ? round((value / base) * 100) : '';
+  return {
+    id: v.id,
+    weight: v.weight === undefined || v.weight === null ? '' : Number(v.weight),
+    weight_unit: v.weight_unit || 'g',
+    price: base,
+    discount_percent: discount,
+    size_name: variantLabel(v),
+    size_name_en: '',
+    sku: '',
+    sale_price: '',
+    stock_quantity: '',
+  };
+}
+
+const defaultVariant = (variants) => variants.find((v) => isOn(v.is_default)) || variants[0];
+
+/**
+ * List rows carry `default_variant` + `price_range` and category *names*; the show endpoint carries full `variants` and
+ * category objects. Both are handled here (a category given by name is matched against the category list).
+ */
+function toProductRow(p, categories) {
+  const variants = p.variants || [];
+  const def = p.default_variant || defaultVariant(variants);
+  let min = 0;
+  let max = 0;
+  if (variants.length) {
+    const prices = variants.map(finalPrice);
+    min = Math.min(...prices);
+    max = Math.max(...prices);
+  } else if (p.price_range) {
+    max = Number(p.price_range.max) || 0;
+    min = Math.min(Number(p.price_range.min) || 0, def?.effective_price ?? Infinity);
+    min = Number.isFinite(min) ? round(min) : 0;
+  }
+  const entries = p.categories_ar ?? p.categories ?? [];
+  const ids = [];
+  const names = [];
+  for (const entry of entries) {
+    const found = typeof entry === 'object' ? categories.find((c) => c.id === entry.id) : categories.find((c) => c.name_ar === entry || c.name_en === entry);
+    if (found) ids.push(found.id);
+    names.push(typeof entry === 'string' ? entry : found?.name_ar || '');
+  }
+  if (!ids.length) ids.push(...(p.category_ids ?? []));
+  const cat = categories.find((c) => c.id === ids[0]);
+  const name = txPair(p, 'name');
+  const gallery = mediaList(p.gallery?.length ? p.gallery : p.image);
+  return {
+    id: p.id,
+    name_ar: name.ar,
+    name_en: name.en,
+    slug: tx(p, 'slug', 'en') || tx(p, 'slug', 'ar'),
+    featured_image: gallery[0]?.url || '',
+    category_id: ids[0] ?? '',
+    category_ids: ids,
+    category_names: names,
+    category_name_ar: cat?.name_ar ?? names[0],
+    category_name_en: cat?.name_en ?? names[0],
+    category_slug: cat?.slug,
+    weight: def ? variantLabel(def) : '',
+    badge: '',
+    variants_count: variants.length,
+    min_price: min,
+    max_price: max,
+    total_stock: null, // the backend has no stock counter
+    is_preorder: p.availability === 'preorder',
+    availability: p.availability,
+    status: isOn(p.is_published) ? 'published' : 'draft',
+    is_active: p.is_active === undefined ? true : isOn(p.is_active),
+  };
+}
+
+/** @param {{ cat?: string }} [params] cat = category slug or id */
+export async function listProducts({ cat } = {}) {
+  const [products, categories] = await Promise.all([fetchAllBilingual(e.products.list), listCategories()]);
+  const rows = products.map((p) => toProductRow(p, categories));
+  const wanted = cat ? categories.find((c) => c.slug === cat || String(c.id) === String(cat)) : null;
+  const match = (r) => wanted && (r.category_ids.includes(wanted.id) || r.category_names.includes(wanted.name_ar) || r.category_names.includes(wanted.name_en));
+  return (cat ? rows.filter(match) : rows).sort((x, y) => y.id - x.id);
+}
+
+export async function getProduct(id) {
+  const [raw, categories] = await Promise.all([api.get(e.products.item(id)).then(unwrap), listCategories()]);
+  const row = toProductRow(raw, categories);
+  const gallery = mediaList(raw.gallery ?? raw.images ?? raw.media);
+  const variants = (raw.variants || []).map(toVariantForm);
+  return {
+    product: {
+      ...row,
+      description_ar: tx(raw, 'description', 'ar'),
+      description_en: tx(raw, 'description', 'en'),
+      name_ar: tx(raw, 'name', 'ar') || row.name_ar,
+      name_en: tx(raw, 'name', 'en') || row.name_en,
+      slug_en: tx(raw, 'slug', 'en'),
+      slug_ar: tx(raw, 'slug', 'ar'),
+      sku: raw.barcode ?? '',
+      is_fragile: isOn(raw.is_fragile),
+      price: 0,
+      sale_price: null,
+      stock_quantity: 0,
+      preorder_date: '',
+      gallery_existing: gallery,
+      extras: {
+        show_purchase_count: isOn(raw.show_purchase_count),
+        manual_purchase_count: raw.manual_purchase_count ?? undefined,
+        is_featured_override: isOn(raw.is_featured_override),
+        is_active: row.is_active,
+      },
+    },
+    variants,
+    categories,
+  };
+}
+
+export const listProductFormOptions = async () => ({ categories: await listCategories() });
+
+async function productBody(values) {
+  const slugs = values.slug_en || values.slug_ar ? { en: values.slug_en, ar: values.slug_ar } : slugPair({ name_en: values.name_en, name_ar: values.name_ar });
+  const name_en = (values.name_en || '').trim() || values.name_ar;
+  const existing = values.gallery_existing || [];
+  const gallery = [];
+  for (const item of values.gallery || []) {
+    if (item instanceof File) gallery.push(await uploadMedia(item, { model: 'Product', option: 'gallery' }));
+    else {
+      const kept = existing.find((m) => m.url === item);
+      if (kept?.id != null) gallery.push(kept.id);
+    }
+  }
+  // Keep an unavailable product unavailable; the form only knows "pre-order or not".
+  const availability = values.is_preorder ? 'preorder' : values.availability && values.availability !== 'preorder' ? values.availability : 'available';
+  const extras = values.extras || {};
+  return {
+    barcode: values.sku || undefined,
+    is_fragile: !!values.is_fragile,
+    show_purchase_count: !!extras.show_purchase_count,
+    manual_purchase_count: extras.manual_purchase_count,
+    availability,
+    is_published: values.status !== 'draft',
+    is_featured_override: !!extras.is_featured_override,
+    is_active: extras.is_active ?? true,
+    gallery,
+    category_ids: [values.category_id],
+    variants: (values.variants || []).map((v, i) => {
+      const pct = Number(v.discount_percent) || 0;
+      return {
+        id: v.id,
+        weight: v.weight,
+        weight_unit: v.weight_unit || 'g',
+        base_price: v.price,
+        is_default: i === 0,
+        discount_type: pct > 0 ? 'percentage' : undefined,
+        discount_value: pct > 0 ? pct : undefined,
+        discount_active: pct > 0,
+      };
+    }),
+    en: { name: name_en, description: (values.description_en || '').trim(), slug: slugs.en },
+    ar: { name: values.name_ar, description: (values.description_ar || '').trim(), slug: slugs.ar },
+  };
+}
+
+export const createProduct = (values) => withFormErrors(productBody(values).then((body) => api.post(e.products.list, toFormData(body)).then(unwrap)));
+export const updateProduct = (id, values) =>
+  withFormErrors(productBody(values).then((body) => api.post(e.products.item(id), toFormData({ ...body, _method: 'PUT' })).then(unwrap)));
+export const deleteProduct = async (id) => api.delete(e.products.item(id));
+export const toggleProductPublished = async (id) => unwrap(await api.post(e.productPublished(id)));
+export const updateStock = async ({ variantId, stock }) => unwrap(await api.post(e.variantStock(variantId), { stock }));
+
+// --------------------------------------------------------------------------------------------- warehouses
+export const listWarehouses = async () => unwrap(await api.get(e.warehouses.list));
+export const createWarehouse = async (values) => unwrap(await api.post(e.warehouses.list, values));
+export const updateWarehouse = async (id, values) => unwrap(await api.put(e.warehouses.item(id), values));
+export const deleteWarehouse = async (id) => api.delete(e.warehouses.item(id));
+
+export const listOrders = async () => unwrap(await api.get(e.orders.list));
+export const getOrder = async (id) => unwrap(await api.get(e.orders.item(id)));
+export const updateOrderStatus = async ({ id, ...body }) => unwrap(await api.patch(e.orderStatus(id), body));
+export const generateWaybill = async (id) => unwrap(await api.post(e.orderWaybill(id)));

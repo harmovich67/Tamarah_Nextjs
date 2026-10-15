@@ -1,0 +1,43 @@
+@import "tailwindcss" source(none);
+@source "../../resources/views/admin";
+@source "../../resources/views/layouts/admin.php";
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("../fonts/thmanyah-sans-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("../fonts/thmanyah-sans-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("../fonts/thmanyah-sans-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Thmanyah Sans", "Cairo", sans-serif;
+  --color-primary-50: #eff7ee;
+  --color-primary-100: #d9edd7;
+  --color-primary-200: #b4dbae;
+  --color-primary-500: #23531e;
+  --color-primary-600: #1b4218;
+  --color-primary-700: #153313;
+  --color-primary-800: #0e230d;
+  --color-primary-900: #081507;
+  --color-gold-400: #dfc282;
+  --color-gold-500: #c49a52;
+  --color-gold-600: #a37b34;
+  --color-gold-700: #7d5c21;
+}

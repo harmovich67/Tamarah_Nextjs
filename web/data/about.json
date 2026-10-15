@@ -1,0 +1,380 @@
+{
+ "hero": {
+  "eyebrow": {
+   "ar": "من نحن",
+   "en": "Our story"
+  },
+  "title": {
+   "ar": "تراثٌ عريق..\nمن جذورنا إلى آفاق المستقبل",
+   "en": "A rich heritage.\nFrom our roots to the horizon."
+  },
+  "description": {
+   "ar": "في تمرنا نؤمن أن التمر أكثر من غذاء؛ إنه قصة أرض وهوية أصيلة. نختار بعناية لنقدّم تجربة تليق بالضيافة السعودية.",
+   "en": "At Tamrna, dates are more than food. They carry the story of our land and identity, selected with care for true Saudi hospitality."
+  },
+  "action": {
+   "ar": "اكتشف قصتنا",
+   "en": "Discover our story"
+  },
+  "image": "/images/home/heritage.webp"
+ },
+ "story": {
+  "eyebrow": {
+   "ar": "قصتنا",
+   "en": "Our story"
+  },
+  "title": {
+   "ar": "من جذورنا إلى موائد العالم",
+   "en": "From our roots to tables everywhere"
+  },
+  "description": {
+   "ar": "بدأت تمرنا برؤية بسيطة: أن نشارك العالم جودة التمور السعودية وأصالتها. نعمل بعناية مع مصادر محلية، ونقدّم تجربة تجمع التراث السعودي بالتجارة الحديثة.",
+   "en": "Tamrna began with a simple vision: to share the quality and heritage of Saudi dates through a modern, thoughtful shopping experience."
+  },
+  "image": "/images/home/ajwa.webp",
+  "imageAlt": {
+   "ar": "تمور سعودية مختارة في وعاء تراثي",
+   "en": "Selected Saudi dates in a heritage bowl"
+  }
+ },
+ "pillars": [
+  {
+   "id": "quality",
+   "icon": "award",
+   "title": {
+    "ar": "جودة أصيلة",
+    "en": "Authentic quality"
+   },
+   "description": {
+    "ar": "اختيار يليق بالضيافة",
+    "en": "Chosen for hospitality"
+   }
+  },
+  {
+   "id": "trust",
+   "icon": "heart",
+   "title": {
+    "ar": "ثقة مستمرة",
+    "en": "Lasting trust"
+   },
+   "description": {
+    "ar": "عناية في كل تجربة",
+    "en": "Care in every experience"
+   }
+  },
+  {
+   "id": "community",
+   "icon": "people",
+   "title": {
+    "ar": "مجتمع أكبر",
+    "en": "A wider community"
+   },
+   "description": {
+    "ar": "روابط تبدأ من الأرض",
+    "en": "Connections rooted in the land"
+   }
+  },
+  {
+   "id": "sourcing",
+   "icon": "sprout",
+   "title": {
+    "ar": "مصدر محلي",
+    "en": "Local sourcing"
+   },
+   "description": {
+    "ar": "من مزارع المملكة",
+    "en": "From farms across the Kingdom"
+   }
+  }
+ ],
+ "stats": [
+  {
+   "id": "reach",
+   "icon": "globe",
+   "label": {
+    "ar": "نطاق الوصول",
+    "en": "Reach"
+   },
+   "value": {
+    "ar": "مدن المملكة ودول الخليج",
+    "en": "Saudi cities and the Gulf states"
+   }
+  },
+  {
+   "id": "cities",
+   "icon": "pin",
+   "label": {
+    "ar": "مدن نخدمها",
+    "en": "Cities served"
+   },
+   "value": {
+    "ar": "جميع مدن المملكة",
+    "en": "Every city in the Kingdom"
+   }
+  },
+  {
+   "id": "express",
+   "icon": "truck",
+   "label": {
+    "ar": "توصيل سريع",
+    "en": "Express delivery"
+   },
+   "value": {
+    "ar": "داخل الأحساء",
+    "en": "Within Al Ahsa"
+   }
+  },
+  {
+   "id": "farms",
+   "icon": "palm",
+   "label": {
+    "ar": "مزارع معتمدة",
+    "en": "Approved farms"
+   },
+   "value": {
+    "ar": "مزارع الأحساء والقصيم والمدينة",
+    "en": "Al Ahsa, Qassim and Madinah farms"
+   }
+  }
+ ],
+ "values": [
+  {
+   "id": "experience",
+   "icon": "palm",
+   "title": {
+    "ar": "خبرة تمتد لسنوات",
+    "en": "Years of experience"
+   },
+   "description": {
+    "ar": "خبرة اكتسبناها من شغفنا بالتمور، وحرصنا المستمر على تقديم الأفضل.",
+    "en": "Experience built on our passion for dates and a constant drive to offer the best."
+   }
+  },
+  {
+   "id": "honesty",
+   "icon": "shield",
+   "title": {
+    "ar": "الصدق والشفافية",
+    "en": "Honesty and clarity"
+   },
+   "description": {
+    "ar": "نوضح ما نقدمه ونجعل الثقة أساس كل تجربة.",
+    "en": "We communicate clearly and make trust central to every experience."
+   }
+  },
+  {
+   "id": "customers",
+   "icon": "heart",
+   "title": {
+    "ar": "رضا عملائنا",
+    "en": "Customer care"
+   },
+   "description": {
+    "ar": "نصغي لعملائنا ونصمم تجربة تليق بتوقعاتهم.",
+    "en": "We listen carefully and shape an experience worthy of our customers."
+   }
+  },
+  {
+   "id": "quality",
+   "icon": "leaf",
+   "title": {
+    "ar": "الجودة أولًا",
+    "en": "Quality first"
+   },
+   "description": {
+    "ar": "نختار بعناية ونهتم بكل تفصيل من المصدر إلى الضيافة.",
+    "en": "We care for every detail, from source to table."
+   }
+  }
+ ],
+ "performance": {
+  "eyebrow": {
+   "ar": "أرقامنا",
+   "en": "Our numbers"
+  },
+  "title": {
+   "ar": "ثقة تصنعها الأرقام",
+   "en": "Numbers that build trust"
+  },
+  "description": {
+   "ar": "مؤشرات نتابعها باستمرار لنحافظ على مستوى الجودة والخدمة.",
+   "en": "Indicators we track continuously to sustain our quality and service."
+  },
+  "items": [
+   {
+    "id": "returns",
+    "icon": "package",
+    "value": "0.3%",
+    "title": {
+     "ar": "مرتجعات محدودة",
+     "en": "Limited returns"
+    },
+    "description": {
+     "ar": "إذ نعمل على فحص كافة المنتجات؛ لضمان جودتها والتأكد من سلامتها",
+     "en": "We inspect every product to confirm its quality and safety."
+    }
+   },
+   {
+    "id": "repeat",
+    "icon": "repeat",
+    "value": "38%",
+    "title": {
+     "ar": "معدل تكرار الشراء",
+     "en": "Repeat purchase rate"
+    },
+    "description": {
+     "ar": "وهي نسبة عالية تكشف عن مدى رضى العميل وثقته",
+     "en": "A high rate that reflects customer satisfaction and trust."
+    }
+   },
+   {
+    "id": "years",
+    "icon": "fingerprint",
+    "value": "+25",
+    "title": {
+     "ar": "عامًا من الخبرة",
+     "en": "Years of experience"
+    },
+    "description": {
+     "ar": "استمرار متنامي قوامه التطوير والإبداع",
+     "en": "Continuous growth built on development and creativity."
+    }
+   }
+  ]
+ },
+ "farms": {
+  "eyebrow": {
+   "ar": "مزارعنا",
+   "en": "Our farms"
+  },
+  "title": {
+   "ar": "حيث تُزرع الأصالة",
+   "en": "Where authenticity is grown"
+  },
+  "description": {
+   "ar": "من مزارع المملكة نختار أجود التمور، بعناية تبدأ من انتقاء الثمرة وتمتد إلى كل تفاصيلها، لنحافظ على جودتها وأصالتها، ونقدّمها بما يليق بإرثها ومكانته.",
+   "en": "From farms across the Kingdom we select the finest dates, with care that begins at picking the fruit and reaches every detail, preserving their quality and authenticity and presenting them as their heritage deserves."
+  },
+  "action": {
+   "ar": "اكتشف منتجاتنا",
+   "en": "Explore our products"
+  },
+  "image": "/images/home/hero.webp"
+ },
+ "sustainability": {
+  "title": {
+   "ar": "معًا لمستقبل أكثر خضرة",
+   "en": "Together for a greener future"
+  },
+  "description": {
+   "ar": "نضع المسؤولية في صميم قراراتنا، وتبقى أي أهداف أو نسب استدامة خاضعة للاعتماد والنشر عبر نظام المحتوى.",
+   "en": "Responsibility guides our choices. Sustainability targets and percentages remain subject to approval in the CMS."
+  },
+  "image": "/images/home/heritage.webp",
+  "imageAlt": {
+   "ar": "نخيل سعودي في ضوء الصباح",
+   "en": "Saudi palms in morning light"
+  },
+  "principles": [
+   {
+    "id": "farms",
+    "icon": "people",
+    "title": {
+     "ar": "دعم المجتمعات المحلية",
+     "en": "Supporting local communities"
+    },
+    "description": {
+     "ar": "شراكات مسؤولة",
+     "en": "Responsible partnerships"
+    }
+   },
+   {
+    "id": "waste",
+    "icon": "sprout",
+    "title": {
+     "ar": "تقليل الهدر",
+     "en": "Reducing waste"
+    },
+    "description": {
+     "ar": "تحسين مستمر",
+     "en": "Continuous improvement"
+    }
+   },
+   {
+    "id": "farming",
+    "icon": "leaf",
+    "title": {
+     "ar": "ممارسات زراعية مسؤولة",
+     "en": "Responsible farming"
+    },
+    "description": {
+     "ar": "وفق بيانات معتمدة",
+     "en": "Based on approved data"
+    }
+   }
+  ]
+ },
+ "quality": {
+  "eyebrow": {
+   "ar": "التزامنا",
+   "en": "Our commitment"
+  },
+  "title": {
+   "ar": "جودة في كل التفاصيل",
+   "en": "Quality in every detail"
+  },
+  "description": {
+   "ar": "من الاختيار إلى التقديم، نهتم بكل مرحلة لتصل إليكم تجربة متسقة تعبّر عن أصالة تمرنا.",
+   "en": "From selection to presentation, every stage is considered for a consistent Tamrna experience."
+  },
+  "action": {
+   "ar": "اكتشف منتجاتنا",
+   "en": "Explore our products"
+  },
+  "images": [
+   {
+    "src": "/images/home/ajwa.webp",
+    "alt": {
+     "ar": "تمور عجوة مختارة",
+     "en": "Selected Ajwa dates"
+    }
+   },
+   {
+    "src": "/images/home/heritage.webp",
+    "alt": {
+     "ar": "عمارة سعودية ونخيل",
+     "en": "Saudi architecture and palms"
+    }
+   },
+   {
+    "src": "/images/home/stuffed.webp",
+    "alt": {
+     "ar": "تمور محشوة ومقدمة بعناية",
+     "en": "Carefully presented stuffed dates"
+    }
+   },
+   {
+    "src": "/images/home/sukkari.webp",
+    "alt": {
+     "ar": "تمور سكري على النخلة",
+     "en": "Sukkari dates and palms"
+    }
+   }
+  ]
+ },
+ "gift": {
+  "title": {
+   "ar": "أهدِ أصالة التمر لمن تحب",
+   "en": "Share the gift of authentic dates"
+  },
+  "description": {
+   "ar": "بطاقات إهداء تحمل معنى الضيافة.",
+   "en": "Gift cards inspired by Saudi hospitality."
+  },
+  "action": {
+   "ar": "اكتشف بطاقات الإهداء",
+   "en": "Explore gift cards"
+  },
+  "image": "/images/home/gifting.webp"
+ }
+}

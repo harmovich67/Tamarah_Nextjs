@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="pioneerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#065f46"/>
+      <stop offset="50%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="pioneerGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle & Hexagon Ring -->
+  <circle cx="100" cy="100" r="90" fill="url(#pioneerGrad)" stroke="#ffffff" stroke-width="4"/>
+  <circle cx="100" cy="100" r="78" fill="none" stroke="url(#pioneerGold)" stroke-width="2.5" stroke-dasharray="6 3"/>
+  <!-- Graduation Cap & Feather Quill -->
+  <polygon points="100,55 145,72 100,89 55,72" fill="url(#pioneerGold)"/>
+  <rect x="75" y="80" width="50" height="15" rx="3" fill="#ffffff"/>
+  <path d="M140,75 L143,105 C143,108 140,112 135,112" stroke="#f59e0b" stroke-width="2.5" fill="none"/>
+  <!-- School Name -->
+  <text x="100" y="132" font-family="'Cairo', sans-serif" font-size="15" font-weight="900" fill="#ffffff" text-anchor="middle">رواد المستقبل</text>
+  <text x="100" y="150" font-family="'Cairo', sans-serif" font-size="10" font-weight="700" fill="#a7f3d0" text-anchor="middle">FUTURE PIONEERS</text>
+  <!-- Stars -->
+  <circle cx="70" cy="165" r="3" fill="#fbbf24"/>
+  <circle cx="100" cy="167" r="4" fill="#fbbf24"/>
+  <circle cx="130" cy="165" r="3" fill="#fbbf24"/>
+</svg>

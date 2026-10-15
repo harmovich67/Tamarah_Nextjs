@@ -1,0 +1,22 @@
+{
+  "name": "@tamrna/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Code shared by the public website and the admin dashboard: constants, utilities, i18n, validation schemas, API client and the mock data layer.",
+  "exports": {
+    "./constants": "./constants/index.js",
+    "./tokens": "./constants/tokens.js",
+    "./utils": "./utils/index.js",
+    "./i18n": "./i18n/index.js",
+    "./icons": "./icons/index.js",
+    "./schemas": "./schemas/index.js",
+    "./api": "./api/index.js",
+    "./mocks": "./mocks/index.js",
+    "./components/*": "./components/*.jsx"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "zod": ">=3"
+  }
+}

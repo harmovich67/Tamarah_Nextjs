@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="noorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Shield -->
+  <path d="M100,12 L175,38 C175,130 100,188 100,188 C100,188 25,130 25,38 Z" fill="url(#noorGrad)" stroke="#ffffff" stroke-width="4"/>
+  <!-- Sunburst / Light Rays (Al-Noor means Light) -->
+  <circle cx="100" cy="80" r="22" fill="url(#sunGrad)"/>
+  <path d="M100,45 L100,53 M100,107 L100,115 M65,80 L73,80 M127,80 L135,80 M75,55 L81,61 M119,99 L125,105 M75,105 L81,99 M119,61 L125,55" stroke="url(#sunGrad)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Open Book at base of sun -->
+  <path d="M100,95 C85,88 65,90 55,93 L55,115 C65,112 85,110 100,118 C115,110 135,112 145,115 L145,93 C135,90 115,88 100,95 Z" fill="#ffffff"/>
+  <!-- School Name -->
+  <text x="100" y="146" font-family="'Cairo', sans-serif" font-size="16" font-weight="900" fill="#ffffff" text-anchor="middle">مدارس النور</text>
+  <text x="100" y="164" font-family="'Cairo', sans-serif" font-size="10" font-weight="700" fill="#ddd6fe" text-anchor="middle">AL-NOOR SCHOOLS</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs>
+    <linearGradient id="azGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="azGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded Square Container -->
+  <rect x="15" y="15" width="190" height="190" rx="45" fill="url(#azGrad)" stroke="#ffffff" stroke-width="4"/>
+  <!-- Graduation Cap Icon -->
+  <polygon points="110,60 165,82 110,104 55,82" fill="url(#azGold)"/>
+  <rect x="80" y="93" width="60" height="18" rx="4" fill="#ffffff"/>
+  <path d="M160,86 L163,122 C163,126 158,130 152,130" stroke="#fbbf24" stroke-width="3" fill="none"/>
+  <!-- Store Text -->
+  <text x="110" y="152" font-family="'Cairo', sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">AL-AZ</text>
+  <text x="110" y="174" font-family="'Cairo', sans-serif" font-size="12" font-weight="700" fill="#fef08a" text-anchor="middle">منصة الزي المدرسي</text>
+</svg>

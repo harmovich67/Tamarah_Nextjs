@@ -1,0 +1,26 @@
+{
+  "name": "tamrna-modern",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tamrna storefront (Next.js) + admin dashboard (React/Vite) migrated from the legacy PHP application, ready for a Laravel API.",
+  "workspaces": [
+    "shared",
+    "web",
+    "dashboard"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w web",
+    "dev:dashboard": "npm run dev -w dashboard",
+    "build:web": "npm run build -w web",
+    "build:dashboard": "npm run build -w dashboard",
+    "build": "npm run build:web && npm run build:dashboard",
+    "lint": "npm run lint -w web && npm run lint -w dashboard",
+    "connect": "node tools/connect/index.mjs"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "devDependencies": {
+    "yaml": "^2.9.1"
+  }
+}

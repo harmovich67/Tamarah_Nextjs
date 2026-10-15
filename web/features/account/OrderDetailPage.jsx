@@ -1,0 +1,161 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toFriendlyMessage } from '@tamrna/shared/api';
+import { Icon } from '@tamrna/shared/components/Icon';
+import { numberFormat } from '@tamrna/shared/utils';
+import { useLocale } from '@/components/LocaleProvider';
+import { Flash } from '@/components/ui/FormField';
+import { ErrorState, LoadingState } from '@/components/ui/States';
+import { accountService } from '@/services';
+import { showToast } from '@/store/toastStore';
+import { asset } from '@/lib/asset';
+import AccountShell from './AccountShell';
+
+const STEP1 = ['pending', 'قيد المراجعة', ''];
+const STEP2 = ['processing', 'ready_for_pickup', 'confirmed', 'قيد التجهيز', 'تم التأكيد'];
+const STEP3 = ['shipped', 'out_for_delivery', 'in_transit', 'تم الشحن', 'خرج للتوصيل'];
+const STEP4 = ['delivered', 'completed', 'تم التسليم'];
+
+function Body({ data: d, cancel: c }) {
+  const { tr, currency } = useLocale();
+  const { order, items, settings } = d;
+  const shippingStatus = String(order.shipping_status || 'pending').toLowerCase();
+  let step = 1;
+  if (STEP2.includes(shippingStatus)) step = 2;
+  else if (STEP3.includes(shippingStatus)) step = 3;
+  else if (STEP4.includes(shippingStatus)) step = 4;
+  const showStepper = String(settings.enable_order_tracking_stepper ?? '1') === '1';
+  const allowCancel = settings.allow_customer_order_cancellation && STEP1.includes(shippingStatus) && order.payment_status !== 'paid';
+  const money = (n) => `${numberFormat(n, 2)} ${currency}`;
+  const steps = [
+    ['check', tr('تم استلام الطلب', 'Order Confirmed'), tr('تم تسجيل وتأكيد الطلب', 'Order recorded in system')],
+    ['package', tr('التجهيز والتغليف المبرد', 'Cold Packaging'), tr('فرز وتغليف التمور الفاخرة', 'Fresh sorting and sealing')],
+    ['truck', tr('خرج للشحن المبرد', 'Out for Delivery'), tr('مع مندوب الشحن المبرد', 'In refrigerated transit')],
+    ['tree-palm', tr('تم التسليم', 'Delivered'), tr('بالصحة والعافية', 'Enjoy your royal dates')],
+  ];
+  const paidOnline = ['mada', 'apple_pay', 'tamara', 'tabby', 'card', 'paymob', 'credit_card'].includes(order.payment_method);
+  const methodLabel = paidOnline
+    ? order.payment_method === 'apple_pay' ? 'أبل باي Apple Pay' : order.payment_method === 'tamara' ? 'تمارا Tamara' : order.payment_method === 'tabby' ? 'تابي Tabby' : 'مدى / بطاقة بنكية'
+    : order.payment_method === 'bank_transfer' ? tr('تحويل بنكي', 'Bank Transfer') : tr('الدفع عند الاستلام', 'Cash On Delivery');
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {allowCancel && (
+          <button type="button" className="button button--danger" disabled={c.isPending} onClick={() => window.confirm(tr('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟', 'Are you sure you want to cancel this order?')) && c.mutate()}>
+            <Icon name="x-circle" size={18} />{tr('إلغاء الطلب', 'Cancel Order')}
+          </button>
+        )}
+        <button type="button" className="button button--outline" onClick={() => window.print()}>
+          <Icon name="file-text" size={18} />{tr('طباعة الفاتورة', 'Print Invoice')}
+        </button>
+      </div>
+
+      {showStepper && shippingStatus !== 'cancelled' ? (
+        <section className="account-card">
+          <header><span><Icon name="snowflake" size={21} /></span><h2>{tr('مراحل تجهيز وشحن الطلب المبرد', 'Cold Freight Tracking Timeline')}</h2></header>
+          <ol className="order-steps">
+            {steps.map(([icon, title, desc], i) => (
+              <li key={title} className={`${step >= i + 1 ? 'is-done' : ''} ${step === i + 1 ? 'is-current' : ''}`.trim()}>
+                <span><Icon name={icon} size={22} /></span>
+                <strong>{title}</strong>
+                <small>{desc}</small>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : shippingStatus === 'cancelled' ? (
+        <Flash type="error" icon="alert-octagon"><strong>{tr('تم إلغاء هذا الطلب بناء على طلب العميل أو الإدارة.', 'This order has been cancelled.')}</strong></Flash>
+      ) : null}
+
+      <div className="account-order-detail-grid">
+        <section className="account-card">
+          <header><span><Icon name="package" size={21} /></span><h2>{tr('أصناف التمور المطلوبة', 'Order Items')} ({items.length})</h2></header>
+          <ul className="account-lines">
+            {items.map((item) => (
+              <li key={item.id}>
+                {item.product_image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={asset(item.product_image)} alt={item.product_name} />
+                ) : (
+                  <span style={{ display: 'grid', placeItems: 'center', width: 64, height: 72, borderRadius: 8, background: '#eee5d8', color: '#174a37' }}><Icon name="package" size={26} /></span>
+                )}
+                <div>
+                  <strong>{item.product_name}</strong>
+                  <small>{item.size_name ? `${item.size_name} · ` : ''}{tr('الكمية', 'Quantity')}: {item.quantity}</small>
+                </div>
+                <div style={{ textAlign: 'end' }}>
+                  <strong>{money(item.subtotal)}</strong>
+                  <small>{numberFormat(item.unit_price, 2)} × {item.quantity}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+          <section className="account-card">
+            <header><span><Icon name="map-pin" size={21} /></span><h2>{tr('عنوان التوصيل الوطني', 'Delivery Address')}</h2></header>
+            <div className="account-address-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <article style={{ minHeight: 0 }}>
+                <h3>{order.customer_name}</h3>
+                <p dir="ltr" style={{ textAlign: 'start' }}>{order.customer_phone}</p>
+                <p>{order.shipping_address}</p>
+                <small>{order.city || 'المملكة العربية السعودية'}</small>
+              </article>
+            </div>
+            {order.notes ? <div className="account-review-note" style={{ margin: '12px 0 0' }}><b>{tr('ملاحظات التوصيل', 'Delivery Notes')}:</b> {order.notes}</div> : null}
+          </section>
+
+          <section className="account-card">
+            <header><span><Icon name="file-text" size={21} /></span><h2>{tr('ملخص الدفع والحساب', 'Payment Summary')}</h2></header>
+            <div className="summary-row"><span>{tr('مجموع المنتجات', 'Subtotal')}</span><strong>{money(order.subtotal)}</strong></div>
+            <div className="summary-row"><span>{tr('رسوم الشحن المبرد', 'Cold Express Delivery')}</span><strong>{Number(order.shipping_fee) === 0 ? tr('مجاناً', 'Free') : money(order.shipping_fee)}</strong></div>
+            {Number(order.discount) > 0 && <div className="summary-row summary-row--discount"><span>{tr('خصم خاص', 'Special Discount')}</span><strong>-{money(order.discount)}</strong></div>}
+            <div className="summary-row summary-row--total"><span>{tr('المبلغ الإجمالي الكلي', 'Grand Total')}</span><strong>{money(order.total)}</strong></div>
+            <div className="checkout-delivery-summary">
+              <small>{tr('طريقة الدفع', 'Payment Method')}</small>
+              <strong>{methodLabel}</strong>
+              <small>{tr('حالة السداد', 'Payment Status')}</small>
+              <strong style={{ color: order.payment_status === 'paid' ? '#176044' : '#71501c' }}>
+                {order.payment_status === 'paid' ? tr('تم السداد بنجاح', 'Paid Online') : tr('بانتظار التحصيل عند الاستلام', 'Awaiting Payment')}
+              </strong>
+            </div>
+          </section>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Order detail with the cold-freight tracking stepper (profile/order_detail.php). */
+export default function OrderDetailPage({ orderNumber }) {
+  const { locale, tr, currency } = useLocale();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['account', 'order', orderNumber], queryFn: () => accountService.getOrder(orderNumber), retry: false });
+
+  const cancel = useMutation({
+    mutationFn: () => accountService.cancelOrder(orderNumber),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['account'] });
+      showToast(tr('تم إلغاء الطلب بنجاح.', 'Order was successfully cancelled.'), 'success');
+    },
+    onError: (e) => showToast(toFriendlyMessage(e, locale), 'error'),
+  });
+
+  const heading = `${tr('طلب رقم', 'Order')}: ${orderNumber}`;
+
+  useEffect(() => {
+    if (isError && error?.status === 404) router.replace('/profile/orders');
+  }, [isError, error, router]);
+
+  return (
+    <AccountShell active="orders" heading={heading}>
+      {isLoading ? <LoadingState rows={2} /> : isError ? <ErrorState onRetry={refetch} /> : <Body data={data} cancel={cancel} />}
+    </AccountShell>
+  );
+}

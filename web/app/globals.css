@@ -1,0 +1,26 @@
+/*
+ * Tailwind is available for new UI (theme tokens + utilities), but Preflight is intentionally NOT imported:
+ * the migrated Tamrna Foundation stylesheets (styles/legacy/*.css, loaded in app/layout.js) own the reset and
+ * every component style, so existing pages stay pixel-identical to the PHP storefront.
+ */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+  --font-sans: 'thmanyahSans', 'thmanyahSans Fallback', 'Geeza Pro', 'Tahoma', sans-serif;
+  --font-display: 'thmanyahDisplay', 'thmanyahDisplay Fallback', 'Geeza Pro', serif;
+  --color-brand-900: #123b2d;
+  --color-brand-800: #194c3b;
+  --color-brand-700: #256149;
+  --color-brand-600: #367858;
+  --color-cream-50: #fbf8f1;
+  --color-cream-100: #f5efe3;
+  --color-sand-100: #ece3d2;
+  --color-sand-200: #dcccb2;
+  --color-gold-400: #ccb17b;
+  --color-gold-500: #a48649;
+  --color-earth-600: #816650;
+  --color-earth-800: #4e3c2d;
+  --color-ink: #1d352a;
+  --color-danger: #a33228;
+}
