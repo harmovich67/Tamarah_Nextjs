@@ -178,7 +178,11 @@ export async function getProduct(id) {
   const [raw, categories] = await Promise.all([api.get(e.products.item(id)).then(unwrap), listCategories()]);
   const row = toProductRow(raw, categories);
   const gallery = mediaList(raw.gallery ?? raw.images ?? raw.media);
-  const variants = (raw.variants || []).map(toVariantForm);
+  // The form treats the first pack as the default one (is_default is re-sent by position on save), so list it first.
+  const variants = (raw.variants || [])
+    .slice()
+    .sort((a, b) => Number(isOn(b.is_default)) - Number(isOn(a.is_default)))
+    .map(toVariantForm);
   return {
     product: {
       ...row,

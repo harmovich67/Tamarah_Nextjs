@@ -3,6 +3,7 @@ import '../styles/legacy/foundation-home.css';
 import '../styles/legacy/foundation-gift.css';
 import '../styles/legacy/foundation-auth.css';
 import '../styles/legacy/foundation-ext.css';
+import '../styles/legacy/foundation-select.css';
 import './globals.css';
 
 import { dirOf } from '@tamrna/shared/constants';
@@ -44,9 +45,6 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang={locale} dir={dirOf(locale)} data-scroll-behavior="smooth" suppressHydrationWarning>
-      <head>
-        <link rel="preload" href="/assets/fonts/thmanyah-sans-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-      </head>
       <body className="storefront-page" suppressHydrationWarning>
         <Providers locale={locale}>
           <StorefrontShell data={shellData}>{children}</StorefrontShell>

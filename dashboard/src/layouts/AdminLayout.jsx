@@ -2,7 +2,7 @@ import { Suspense, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Icon } from '@/components/ui';
+import { Alert, Icon } from '@/components/ui';
 import { PageLoading, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -12,6 +12,30 @@ import { useLocaleStore } from '@/store/localeStore';
 import { authService, systemService } from '@/services';
 import { config } from '@/lib/config';
 import { NAV } from './navigation';
+
+/** Screens the real backend feeds (and therefore the storefront). Everything else still runs on browser-only demo data. */
+const BACKED_PREFIXES = ['/products', '/categories'];
+
+/** Warns on screens that do not reach the backend, so nobody expects their changes to appear on the storefront. */
+function DemoDataNotice({ pathname }) {
+  const { tr } = useT();
+  if (config.apiMode !== 'laravel' || !config.mockFallback) return null;
+  if (BACKED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
+  const home = pathname.startsWith('/home-sections');
+  return (
+    <Alert type="warning" className="mb-5">
+      {home
+        ? tr(
+            'الشرائح (البانرات) متصلة بالخادم، أما باقي أقسام الصفحة الرئيسية فبيانات تجريبية محفوظة في هذا المتصفح فقط ولا تؤثر على الموقع حاليًا.',
+            'Slides (banners) are connected to the server; the other homepage sections are demo data kept in this browser only and do not change the storefront yet.',
+          )
+        : tr(
+            'هذه الشاشة تعمل ببيانات تجريبية محفوظة في هذا المتصفح فقط، ولا تؤثر على الموقع (الخادم لا يوفّر لها واجهة API بعد).',
+            'This screen runs on demo data kept in this browser only and does not change the storefront (the server has no API for it yet).',
+          )}
+    </Alert>
+  );
+}
 
 const LINK_BASE = 'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-medium transition-all duration-150 select-none';
 const LINK_ACTIVE = 'bg-gradient-to-r from-[#143d2b] to-[#0f2c1f] text-white shadow-xs border border-[#1e5c41]/50 font-semibold relative before:absolute before:inset-y-1.5 before:start-0 before:w-1 before:bg-[#22c55e] before:rounded-e-full';
@@ -252,6 +276,7 @@ export default function AdminLayout() {
 
         {/* Content area */}
         <main id="admin-main" className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <DemoDataNotice pathname={location.pathname} />
           <Suspense fallback={<PageLoading />}>
             <Outlet />
           </Suspense>

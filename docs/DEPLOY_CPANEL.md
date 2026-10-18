@@ -51,7 +51,9 @@
        ```
    * أضف المتغيرات البيئية (Environment Variables) في الصفحة:
      ```env
-     NEXT_PUBLIC_API_MODE=mock
+     NEXT_PUBLIC_API_MODE=laravel
+     NEXT_PUBLIC_API_URL=https://tomorna.doha.aait-d.com/api
+     NEXT_PUBLIC_MOCK_FALLBACK=true
      NEXT_PUBLIC_SITE_URL=https://tomornah.wordpress.aait-d.com
      NEXT_PUBLIC_DASHBOARD_URL=https://tomornah.wordpress.aait-d.com/admin
      ```

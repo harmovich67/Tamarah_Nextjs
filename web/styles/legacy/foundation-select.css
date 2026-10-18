@@ -1,0 +1,110 @@
+/*
+ * Dropdowns (select.select / .input.select: catalog sort, city pickers, ...).
+ * Chrome / Edge 135+ support "customizable selects" (appearance: base-select), so the open list gets the storefront
+ * look below. Other browsers keep their native list, with the colours and font of the site where they allow it.
+ */
+select.select,
+.input.select {
+  cursor: pointer;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+select.select:hover { border-color: var(--color-brand-green-600); }
+select.select:focus-visible {
+  outline: 0;
+  border-color: var(--color-brand-green-700);
+  box-shadow: 0 0 0 3px rgb(54 120 88 / 18%);
+}
+select.select:disabled { cursor: not-allowed; opacity: 0.6; }
+
+/* native list (Firefox / Safari / older Chromium): what the browser lets us style */
+select.select option {
+  background: var(--color-cream-50);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+}
+
+@supports (appearance: base-select) {
+  select.select,
+  select.select::picker(select) {
+    appearance: base-select;
+  }
+  select.select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-inline: var(--space-3);
+  }
+  select.select::picker-icon {
+    color: var(--color-brand-green-700);
+    transition: rotate 0.2s ease;
+  }
+  select.select:open::picker-icon { rotate: 180deg; }
+
+  select.select::picker(select) {
+    box-sizing: border-box;
+    margin-block: 6px;
+    padding: 6px;
+    max-height: min(320px, 60vh);
+    overflow-y: auto;
+    border: 1px solid var(--color-sand-200);
+    border-radius: var(--radius-lg);
+    background: var(--color-cream-50);
+    box-shadow: var(--shadow-elevated);
+    font-family: var(--font-body);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, display 0.15s allow-discrete, overlay 0.15s allow-discrete;
+  }
+  select.select:open::picker(select) {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    select.select:open::picker(select) {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  select.select option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-md);
+    background: transparent;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+  select.select option:hover,
+  select.select option:focus-visible {
+    background: var(--color-sand-100);
+    outline: 0;
+  }
+  select.select option:checked {
+    background: rgb(54 120 88 / 12%);
+    color: var(--color-brand-green-800);
+    font-weight: 700;
+  }
+  select.select option::checkmark {
+    order: 1;
+    color: var(--color-brand-green-700);
+  }
+  select.select option:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  select.select,
+  select.select::picker(select),
+  select.select::picker-icon,
+  select.select option {
+    transition: none;
+  }
+}

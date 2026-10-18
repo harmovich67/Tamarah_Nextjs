@@ -62,6 +62,18 @@ Give it the backend's **OpenAPI/Swagger (json/yaml)**, a **Postman collection**,
 
 Existing files get a `.bak` copy. Details of what the backend must provide are in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
 
+### Tamrna backend — storefront (`web/`)
+
+With `NEXT_PUBLIC_API_MODE=laravel` (`web/.env.local`) the storefront shows what the dashboard saves: **catalog, product pages, home-page products / categories and the guest cart** come from `/client/*` (`web/services/adapters/tamrna/index.js`, wired in `web/services/index.js`).
+Checkout / payment, accounts and login, coupons, menus, settings and the hero slider stay on mock data (the backend has none of these yet; `NEXT_PUBLIC_MOCK_FALLBACK=false` disables the fallback).
+
+* Product URLs are `/product/<id>-<slug>`: the backend slug is not unique, so the id in front makes the lookup exact.
+* Categories are derived from the products (a category with no product is not listed) until `GET /client/departments` works; it currently answers 500 (`banners.sort_order` column missing on the server, same for `/client/about` and `/client/gift-cards`).
+* Product list / categories are cached 30 s per server process, so a change made in the dashboard shows up within half a minute.
+* The backend cart returns `price: "0.00"` for every line, so the adapter reads the price from the product. Guests are identified by a random `guest_token` kept in the browser.
+* `POST /client/contact` answers 401 for guests (checked on the live server), so the contact form shows a clear error until the backend allows it.
+* Stock is not saved by the backend yet, so a purchasable product counts as in stock.
+
 ### Tamrna backend (Postman collection `tomorona`) — dashboard
 
 The dashboard is wired to the real backend for **login, categories, products and homepage banners** (`dashboard/.env.local`: `VITE_API_MODE=laravel`, `VITE_API_URL`).
