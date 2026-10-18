@@ -1,11 +1,14 @@
-# Single-page app on Apache / cPanel: send every non-file route to index.html (React Router).
+# Single-page app on Apache / cPanel: disable Passenger in subfolders and route to index.html
+<IfModule mod_passenger.c>
+  PassengerEnabled off
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  RewriteRule . index.html [L]
 </IfModule>
 
 # Hashed build files never change: cache them for a year. index.html must always be revalidated.

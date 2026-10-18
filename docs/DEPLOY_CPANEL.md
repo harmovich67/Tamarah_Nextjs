@@ -1,57 +1,85 @@
-# النشر على cPanel
+# النشر على cPanel — نطاق https://tomornah.wordpress.aait-d.com
 
-الداشبورد ملفات ثابتة (تتبني على جهازك وتترفع). الموقع (Next.js) محتاج Node.js على السيرفر.
-الأفضل دومين فرعي لكل واحد (مثلاً `admin.example.com` للداشبورد و`example.com` للموقع)، لأن الـbuild بيفترض إن التطبيق على جذر الدومين.
+تم ضبط المشروع ليعمل المتجر على جذر الموقع (`/`)، ولوحة التحكم (الداشبورد) على المسار الفرعي (`/admin`) على نفس النطاق:
+* **المتجر الرئيسي (Next.js)**: يعمل على `https://tomornah.wordpress.aait-d.com/` (عبر ميزة Setup Node.js App في cPanel).
+* **لوحة التحكم (Vite / React)**: تعمل على `https://tomornah.wordpress.aait-d.com/admin/` (ملفات ثابتة Static داخل مجلد `admin` بدون الحاجة لسيرفر منفصل).
 
-## 1) الداشبورد (admin)
+---
 
-1. في `dashboard/.env.local` (مش بيترفع على git) حط القيم الحقيقية قبل البناء، لأن Vite بيدمجها في الملفات وقت الـbuild:
+## 1) بناء ورفع لوحة التحكم (الداشبورد إلى `/admin`)
 
-   ```
+1. تأكد من إعدادات ملف `dashboard/.env.local` (تم تجهيزها بالنطاق الفعلي):
+   ```env
    VITE_API_MODE=laravel
    VITE_API_URL=https://tomorna.doha.aait-d.com/api
    VITE_AUTH_STRATEGY=token
    VITE_MOCK_FALLBACK=true
-   VITE_STOREFRONT_URL=https://example.com
+   VITE_STOREFRONT_URL=https://tomornah.wordpress.aait-d.com
    ```
-
-2. ابنِ من جذر المشروع: `npm run build:dashboard`
-3. اضغط **محتوى** `dashboard/dist` (مش المجلد نفسه) في ملف zip.
-4. في cPanel: **File Manager** ← جذر الدومين الفرعي (Document Root) ← Upload ← Extract.
-5. اتأكد إن ملف `.htaccess` ظهر (فعّل Show Hidden Files). هو اللي بيخلي المسارات زي `/products` تشتغل عند refresh.
-
-## 2) الموقع (Next.js)
-
-1. ارفع الكود على السيرفر (cPanel **Git™ Version Control** ← Clone من الريبو) في مجلد خارج `public_html`، مثلاً `~/tamrna`.
-2. cPanel ← **Setup Node.js App** ← Create Application:
-   - Node.js version: 20 أو أحدث (المشروع يطلب `>=20.9`)
-   - Application mode: Production
-   - Application root: `tamrna` (جذر الريبو، لأن `web` بيعتمد على مجلد `shared` في نفس الـworkspace)
-   - Application URL: دومين الموقع
-   - Application startup file: `web/server.cjs`
-3. أضف Environment variables (قبل الـbuild لأن `NEXT_PUBLIC_*` بتتدمج وقت البناء):
-
+2. ابنِ الداشبورد من جهازك بتشغيل:
+   ```bash
+   npm run build:dashboard
    ```
-   NEXT_PUBLIC_API_MODE=mock
-   NEXT_PUBLIC_SITE_URL=https://example.com
-   NEXT_PUBLIC_DASHBOARD_URL=https://admin.example.com
-   ```
+   *(المشروع مبرمج تلقائياً لضبط base المسارات إلى `/admin/` وقت الـ build الإنتاجي)*.
+3. ادخل لمجلد `dashboard/dist` واضغط **جميع محتوياته** (بما في ذلك ملف `.htaccess` ومجلد `assets`) داخل ملف ZIP.
+4. في cPanel:
+   * افتح **File Manager**.
+   * ادخل إلى المجلد الرئيسي للنطاق (Document Root للنطاق `tomornah.wordpress.aait-d.com`، وعادة يكون `public_html` أو مجلد باسم النطاق).
+   * أنشئ مجلداً جديداً باسم `admin`.
+   * ادخل مجلد `admin` وارفع ملف الـ ZIP واستخرجه هناك (Extract).
+   * تأكد من وجود ملف `.htaccess` داخل مجلد `admin` (المشروع يحتوي بالفعل على إعداد `PassengerEnabled off` بداخل `.htaccess` ليعمل بسرعة فائقة وبدون أي تعارض مع Next.js).
 
-   الموقع لسه على بيانات تجريبية (mock) لأنه مش مربوط بالباك.
-4. من الـterminal اللي cPanel بيديهولك (بعد `source` للـvirtualenv اللي بيظهر في الصفحة):
+---
 
-   ```
-   cd ~/tamrna && npm install && npm run build:web
-   ```
+## 2) رفع وتشغيل المتجر (Next.js عبر Setup Node.js App)
 
-5. اضغط **Restart** في صفحة الـNode.js App.
+1. **رفع ملفات المشروع:**
+   * ارفع مجلد المشروع كاملاً إلى السيرفر في مجلد **خارج** `public_html` (مثلاً في المسار الرئيسي للحساب `~/tamrna`).
+   * *طريقة Git:* من cPanel ← **Git™ Version Control** ← استنسخ الريبو (Clone).
+   * *أو طريقة الـ ZIP:* اضغط ملفات المشروع من جهازك (باستثناء `node_modules` و `.next`) وارفعها إلى `~/tamrna` وفك الضغط.
 
-## 3) CORS في الباك اند
+2. **إنشاء التطبيق من Setup Node.js App:**
+   * في cPanel ← افتح **Setup Node.js App** ← اضغط **Create Application**.
+   * املأ الحقول بالتالي:
+     * **Node.js version**: اختر `20.x` أو `22.x` (المشروع يتطلب `>=20.9.0`).
+     * **Application mode**: `Production`.
+     * **Application root**: `tamrna` (جذر المشروع كاملاً لأن `web` يحتاج `shared`).
+     * **Application URL**: اختر النطاق `tomornah.wordpress.aait-d.com`.
+     * **Application startup file**:
+       ```text
+       web/server.cjs
+       ```
+   * أضف المتغيرات البيئية (Environment Variables) في الصفحة:
+     ```env
+     NEXT_PUBLIC_API_MODE=mock
+     NEXT_PUBLIC_SITE_URL=https://tomornah.wordpress.aait-d.com
+     NEXT_PUBLIC_DASHBOARD_URL=https://tomornah.wordpress.aait-d.com/admin
+     ```
+   * اضغط **Create**.
 
-الداشبورد بيكلم `https://tomorna.doha.aait-d.com/api` من دومين تاني، فلازم الباك يسمح بدومين الداشبورد
-(`https://admin.example.com`) في إعدادات CORS (`config/cors.php` → `allowed_origins`)، وإلا المتصفح هيمنع الطلبات.
+3. **تثبيت الحزم وبناء المتجر على السيرفر:**
+   * انسخ أمر تفعيل البيئة (Command to enter virtual environment) الظاهر في أعلى صفحة التطبيق في cPanel.
+   * افتح **Terminal** في cPanel، الصق الأمر، ثم نفذ:
+     ```bash
+     cd ~/tamrna
+     npm install
+     npm run build:web
+     ```
+   * ارجع لصفحة Node.js App واضغط **Restart**.
 
-## 4) التحديث بعدين
+---
 
-- الداشبورد: ابنِ تاني وارفع محتوى `dist` فوق القديم.
-- الموقع: `git pull` ← `npm install` ← `npm run build:web` ← Restart.
+## 3) التحقق واختبار الروابط بعد النشر
+
+* المتجر الرئيسي: `https://tomornah.wordpress.aait-d.com`
+* لوحة التحكم: `https://tomornah.wordpress.aait-d.com/admin`
+* تسجيل دخول الداشبورد: `https://tomornah.wordpress.aait-d.com/admin/login`
+* عند محاولة الدخول على `/admin` من المتجر سيتم توجيهك مباشرة للوحة التحكم.
+
+---
+
+## 4) التحديثات المستقبلية
+
+* **الداشبورد:** بعد أي تعديل، قم بتشغيل `npm run build:dashboard` محلياً، ثم استبدل الملفات داخل مجلد `admin` على السيرفر.
+* **المتجر:** بعد سحب التحديثات على السيرفر (`git pull`)، شغل `npm run build:web` ثم اضغط **Restart** من cPanel.
+

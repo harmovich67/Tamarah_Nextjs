@@ -5,6 +5,7 @@ import path from 'node:path';
 
 // The shared workspace package (../shared) is consumed as source, so Vite must be allowed to read outside root.
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/admin/' : '/'),
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: { port: 5173, fs: { allow: ['..'] } },

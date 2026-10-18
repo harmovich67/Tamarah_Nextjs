@@ -9,6 +9,7 @@
     "dashboard"
   ],
   "scripts": {
+    "dev": "npm run dev:web",
     "dev:web": "npm run dev -w web",
     "dev:dashboard": "npm run dev -w dashboard",
     "build:web": "npm run build -w web",

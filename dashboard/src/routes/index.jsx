@@ -33,12 +33,14 @@ const Security = page(() => import('@/pages/system/Security'));
 const Backup = page(() => import('@/pages/system/Backup'));
 const NotFound = page(() => import('@/pages/NotFound'));
 
-const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
+const rawBase = import.meta.env.BASE_URL || '/';
+const normalizedBase = rawBase.replace(/\/+$/, '');
 
-export const router = createBrowserRouter([
-  { path: '/login', element: <Login /> },
-  {
-    element: <RequireAuth />,
+export const router = createBrowserRouter(
+  [
+    { path: '/login', element: <Login /> },
+    {
+      element: <RequireAuth />,
     children: [
       {
         element: <AdminLayout />,
@@ -78,5 +80,8 @@ export const router = createBrowserRouter([
         ],
       },
     ],
-  },
-]);
+  }],
+  {
+    basename: normalizedBase || undefined,
+  }
+);
