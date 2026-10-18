@@ -11,8 +11,13 @@ const handle = app.getRequestHandler();
 app
   .prepare()
   .then(() => {
-    // Passenger replaces the port, so the value only matters outside cPanel.
-    createServer((req, res) => handle(req, res)).listen(process.env.PORT || 3000);
+    const port = process.env.PORT || 0;
+    const server = createServer((req, res) => handle(req, res));
+    server.listen(port, () => {
+      const addr = server.address();
+      const bound = typeof addr === 'object' && addr ? addr.port : port;
+      console.log(`> Storefront server ready on port ${bound}`);
+    });
   })
   .catch((error) => {
     console.error(error);
