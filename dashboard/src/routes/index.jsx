@@ -1,10 +1,20 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AdminLayout from '@/layouts/AdminLayout';
 import { RequireAuth, RequirePermission } from './guards';
+import { PageLoading } from '@/components/ui';
 
 /** Every screen is a lazy chunk (code splitting); the guards enforce login + permission for UX. */
-const page = (loader) => lazy(loader);
+const page = (loader) => {
+  const Component = lazy(loader);
+  return function LazyPage(props) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <Component {...props} />
+      </Suspense>
+    );
+  };
+};
 const Login = page(() => import('@/pages/Login'));
 const Dashboard = page(() => import('@/pages/Dashboard'));
 const Products = page(() => import('@/pages/products/ProductsPage'));
@@ -32,6 +42,8 @@ const Logs = page(() => import('@/pages/system/Logs'));
 const Security = page(() => import('@/pages/system/Security'));
 const Backup = page(() => import('@/pages/system/Backup'));
 const NotFound = page(() => import('@/pages/NotFound'));
+
+const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
 
 const rawBase = import.meta.env.BASE_URL || '/';
 const normalizedBase = rawBase.replace(/\/+$/, '');
