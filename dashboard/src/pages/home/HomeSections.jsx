@@ -200,7 +200,7 @@ const PLACEMENTS = [['home', 'الرئيسية', 'Home'], ['department', 'الأ
 function BannerDialog({ open, banner, onClose }) {
   const { tr } = useT();
   const editing = !!banner;
-  const blank = { badge_ar: '', badge_en: '', title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'تسوق الآن', cta_en: 'Shop Now', link: '/catalog', image_url: '', image_file: null, placement: 'home', is_active: true, sort_order: '' };
+  const blank = { badge_ar: '', badge_en: '', title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'تسوق الآن', cta_en: 'Shop Now', link: '/catalog', image_url: '', image_file: null, placement: 'home', is_active: true, sort_order: '', image_id: '' };
   const { register, handleSubmit, reset, control, setError, formState: { errors } } = useForm({ defaultValues: blank });
   useEffect(() => {
     if (open) reset(banner ? { ...blank, ...Object.fromEntries(Object.keys(blank).map((k) => [k, banner[k] ?? blank[k]])), image_url: banner.image || '', image_file: null } : blank);
@@ -230,7 +230,7 @@ function BannerDialog({ open, banner, onClose }) {
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-          <Controller control={control} name="image_file" render={({ field }) => <FileUploader label={tr('صورة الشريحة', 'Slide image')} value={field.value || banner?.image || undefined} onChange={field.onChange} maxSizeMB={8} />} />
+          <Controller control={control} name="image_file" render={({ field }) => <FileUploader label={tr('صورة الشريحة', 'Slide image')} value={field.value || banner?.image || undefined} onChange={field.onChange} maxSizeMB={8} error={errors.image_file?.message} />} />
           {!isLaravel && <TextField label={tr('أو مسار الصورة', 'Or image path')} {...dir(true)} inputClassName="text-xs" {...register('image_url')} />}
         </div>
       </form>

@@ -238,7 +238,7 @@ export function PasswordField({ label, error, ...rest }) {
         <input
           id={id}
           type={show ? 'text' : 'password'}
-          className={cx(INPUT, 'pe-10 font-mono tracking-wider', error && INPUT_INVALID)}
+          className={cx(INPUT, 'pe-10 font-mono tracking-wider placeholder:font-sans placeholder:tracking-normal', error && INPUT_INVALID)}
           aria-invalid={error ? 'true' : undefined}
           {...rest}
         />

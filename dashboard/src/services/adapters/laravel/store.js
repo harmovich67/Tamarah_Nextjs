@@ -90,11 +90,23 @@ function toVariantForm(v) {
     size_name_en: '',
     sku: '',
     sale_price: '',
-    stock_quantity: '',
+    stock_quantity: v.stock ?? '', // per-pack stock (only meaningful for box products)
   };
 }
 
 const defaultVariant = (variants) => variants.find((v) => isOn(v.is_default)) || variants[0];
+
+const numOrNull = (x) => (x === null || x === undefined || x === '' ? null : Number(x));
+
+/**
+ * Stock shown in the list. Box products (is_box) keep it inside each variant, the others in the product's own stock.
+ * The list endpoint only carries the default variant, so for a box product with several packs this is a lower bound.
+ */
+function totalStock(p, variants, def) {
+  if (!isOn(p.is_box)) return numOrNull(p.stock);
+  const known = (variants.length ? variants : def ? [def] : []).map((v) => numOrNull(v.stock)).filter((n) => n !== null);
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+}
 
 /**
  * List rows carry `default_variant` + `price_range` and category *names*; the show endpoint carries full `variants` and
@@ -143,7 +155,9 @@ function toProductRow(p, categories) {
     variants_count: variants.length,
     min_price: min,
     max_price: max,
-    total_stock: null, // the backend has no stock counter
+    total_stock: totalStock(p, variants, def),
+    stock_out: !!p.stock_status?.is_out_of_stock,
+    is_box: isOn(p.is_box),
     is_preorder: p.availability === 'preorder',
     availability: p.availability,
     status: isOn(p.is_published) ? 'published' : 'draft',
@@ -178,7 +192,7 @@ export async function getProduct(id) {
       is_fragile: isOn(raw.is_fragile),
       price: 0,
       sale_price: null,
-      stock_quantity: 0,
+      stock_quantity: raw.stock ?? 0, // product-level stock (is_box = false)
       preorder_date: '',
       gallery_existing: gallery,
       extras: {
@@ -210,8 +224,12 @@ async function productBody(values) {
   // Keep an unavailable product unavailable; the form only knows "pre-order or not".
   const availability = values.is_preorder ? 'preorder' : values.availability && values.availability !== 'preorder' ? values.availability : 'available';
   const extras = values.extras || {};
+  // is_box = false: one product-level stock; is_box = true: the stock lives inside each variant.
+  const isBox = !!values.is_box;
   return {
     barcode: values.sku || undefined,
+    is_box: isBox,
+    stock: isBox ? undefined : numOrNull(values.stock_quantity) ?? undefined,
     is_fragile: !!values.is_fragile,
     show_purchase_count: !!extras.show_purchase_count,
     manual_purchase_count: extras.manual_purchase_count,
@@ -228,6 +246,7 @@ async function productBody(values) {
         weight: v.weight,
         weight_unit: v.weight_unit || 'g',
         base_price: v.price,
+        stock: isBox ? numOrNull(v.stock_quantity) ?? undefined : undefined,
         is_default: i === 0,
         discount_type: pct > 0 ? 'percentage' : undefined,
         discount_value: pct > 0 ? pct : undefined,

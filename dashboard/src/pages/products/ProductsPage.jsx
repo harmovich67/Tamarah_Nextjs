@@ -77,7 +77,9 @@ export default function ProductsPage() {
       align: 'center',
       sortValue: (p) => Number(p.total_stock),
       cell: (p) => (
-        p.total_stock == null ? (
+        p.stock_out ? (
+          <span className="px-2.5 py-1 rounded-xl font-black text-xs border bg-rose-50 text-rose-700 border-rose-200/70">{tr('نفد', 'Sold out')}</span>
+        ) : p.total_stock == null ? (
           <span className="text-slate-400">—</span>
         ) : (
           <span className={cx('px-2.5 py-1 rounded-xl font-black text-xs border', p.total_stock <= 15 ? 'bg-amber-50 text-amber-800 border-amber-200/70' : 'bg-emerald-50 text-emerald-800 border-emerald-200/70')}>

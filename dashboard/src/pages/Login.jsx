@@ -104,6 +104,7 @@ export default function Login() {
               <TextField
                 label={tr('رقم الجوال أو البريد الإلكتروني', 'Mobile number or email')}
                 required
+                placeholder={tr('مثال: name@example.com أو 0555123456', 'e.g. name@example.com or 0555123456')}
                 autoComplete="username"
                 maxLength={254}
                 error={errors.identity?.message}
@@ -112,6 +113,7 @@ export default function Login() {
               />
               <PasswordField
                 label={tr('كلمة المرور', 'Password')}
+                placeholder={tr('أدخل كلمة المرور', 'Enter your password')}
                 autoComplete="current-password"
                 error={errors.password?.message}
                 {...register('password')}

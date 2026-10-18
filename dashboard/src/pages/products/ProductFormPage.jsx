@@ -25,6 +25,7 @@ const DEFAULTS = {
   sale_price: '',
   stock_quantity: 50,
   sku: '',
+  is_box: false,
   is_preorder: false,
   preorder_date: '',
   is_fragile: false,
@@ -42,7 +43,7 @@ const DEFAULTS = {
  * Interactive, high-craft packaging variant row.
  * Displays aligned inputs with joined unit addons, live discount preview, and clear status badges.
  */
-function VariantItem({ index: i, isLaravel, remove, register, errors, control, currency }) {
+function VariantItem({ index: i, isLaravel, isBox, remove, register, errors, control, currency }) {
   const { tr } = useT();
   const price = useWatch({ control, name: `variants.${i}.price` });
   const discount = useWatch({ control, name: `variants.${i}.discount_percent` });
@@ -196,6 +197,15 @@ function VariantItem({ index: i, isLaravel, remove, register, errors, control, c
         )}
       </div>
 
+      {/* Per-pack stock: only for box products (is_box); otherwise the product has one stock. */}
+      {isLaravel && isBox ? (
+        <div className="sm:max-w-xs">
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">{tr('الكمية المتوفرة لهذه العبوة', 'Stock for this pack')}</label>
+          <input type="number" min="0" placeholder="0" className={INPUT} {...register(`variants.${i}.stock_quantity`)} />
+          {errors.variants?.[i]?.stock_quantity && <p className="text-[11px] text-rose-500 font-semibold mt-1">{errors.variants[i].stock_quantity.message}</p>}
+        </div>
+      ) : null}
+
       {/* Live Calculated Price Bar (shown if discount is active) */}
       {isLaravel && hasDiscount ? (
         <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-600 flex-wrap gap-2">
@@ -234,6 +244,7 @@ export default function ProductFormPage() {
   const { register, handleSubmit, control, reset, setError, setValue, formState: { errors, isSubmitting } } = form;
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
   const isPreorder = useWatch({ control, name: 'is_preorder' });
+  const isBox = useWatch({ control, name: 'is_box' });
   const categories = data?.categories || [];
 
   useEffect(() => {
@@ -252,6 +263,7 @@ export default function ProductFormPage() {
         sale_price: p.sale_price ?? '',
         stock_quantity: p.stock_quantity,
         sku: p.sku || '',
+        is_box: !!p.is_box,
         is_preorder: !!p.is_preorder,
         preorder_date: p.preorder_date || '',
         is_fragile: !!p.is_fragile,
@@ -347,7 +359,19 @@ export default function ProductFormPage() {
         <div className="space-y-4">
           <SectionHeading icon="dollar-sign">{tr('الأسعار والمخزون والشارات', 'Pricing, stock & badges')}</SectionHeading>
           {isLaravel ? (
-            <TextField label={tr('الباركود', 'Barcode')} placeholder="6281234567890" dir="ltr" inputClassName="font-mono" error={err('sku')} {...register('sku')} />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField label={tr('الباركود', 'Barcode')} placeholder="6281234567890" dir="ltr" inputClassName="font-mono" error={err('sku')} {...register('sku')} />
+                {!isBox && <TextField label={tr('الكمية بالمخزون', 'Stock quantity')} required type="number" min="0" error={err('stock_quantity')} inputClassName="font-bold" {...register('stock_quantity')} />}
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                <CheckField
+                  label={tr('منتج بوكس: المخزون لكل عبوة على حدة', 'Box product: stock is tracked per pack')}
+                  hint={isBox ? tr('أدخل الكمية داخل كل عبوة (Variant) أدناه.', 'Enter the quantity inside each pack (variant) below.') : tr('بدون تفعيل: مخزون واحد للمنتج كله (الحقل أعلاه).', 'Off: one stock for the whole product (the field above).')}
+                  {...register('is_box')}
+                />
+              </div>
+            </div>
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <TextField label={tr('السعر الأساسي (ر.س)', 'Regular price (SAR)')} required type="number" step="0.5" min="0" error={err('price')} inputClassName="font-extrabold text-[#0f764a]" {...register('price')} />
@@ -417,6 +441,7 @@ export default function ProductFormPage() {
                 key={f.id}
                 index={i}
                 isLaravel={isLaravel}
+                isBox={isBox}
                 remove={remove}
                 register={register}
                 errors={errors}

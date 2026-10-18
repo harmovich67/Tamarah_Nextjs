@@ -30,6 +30,7 @@ export const productSchema = (m) =>
       featured_image: z.string().default(''),
       image_file: z.any().optional(),
       // Tamrna backend only (VITE_API_MODE=laravel): gallery files, slugs kept on edit and fields the form does not show.
+      is_box: z.boolean().default(false),
       gallery: z.array(z.any()).default([]),
       gallery_existing: z.array(z.any()).default([]),
       slug_en: z.string().default(''),

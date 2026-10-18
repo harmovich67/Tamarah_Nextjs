@@ -97,7 +97,9 @@ export async function fetchAllBilingual(path, params = {}) {
   const enById = new Map(en.map((r) => [r.id, r]));
   return ar.map((row) => {
     const other = enById.get(row.id) || row;
-    return { ...row, ar: row, en: other, categories_ar: row.categories, categories_en: other.categories };
+    // Keep ar/en blocks if the server already sends them; otherwise the whole row is the text in that language.
+    const block = (r) => (r.ar && typeof r.ar === 'object' ? r.ar : r);
+    return { ...row, ar: block(row), en: other.en && typeof other.en === 'object' ? other.en : other, categories_ar: row.categories, categories_en: other.categories };
   });
 }
 
