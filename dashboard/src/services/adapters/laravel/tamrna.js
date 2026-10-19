@@ -72,6 +72,22 @@ const rowsOf = (res) => {
 const lastPageOf = (res) => res?.meta?.last_page ?? res?.data?.meta?.last_page ?? res?.data?.last_page ?? res?.last_page ?? 1;
 
 /**
+ * Server-side filters shared by the admin list endpoints (categories, products, banners, gift cards, features...):
+ * `?search=` and `?filters[is_active]=0|1` (plus any extra `filters[x]`). Nothing is sent for an unset value, so the
+ * default call still returns every row and the screens keep filtering client side.
+ * @param {{ search?: string, is_active?: boolean | 0 | 1, filters?: Record<string, string | number> }} [opts]
+ */
+export function listFilters({ search, is_active, filters } = {}) {
+  const q = {};
+  if (search && String(search).trim()) q.search = String(search).trim();
+  if (is_active !== undefined && is_active !== null && is_active !== '') q['filters[is_active]'] = isOn(is_active) ? 1 : 0;
+  Object.entries(filters || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') q[`filters[${k}]`] = v;
+  });
+  return q;
+}
+
+/**
  * Admin lists are paginated; the screens filter and sort client side, so walk every page.
  * `lang` sets Accept-Language for this call: list endpoints answer in that one language only.
  */

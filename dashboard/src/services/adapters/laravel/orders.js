@@ -1,7 +1,7 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { unwrap } from './helpers';
-import { fetchAll, mediaList, tx, txPair } from './tamrna';
+import { fetchAll, listFilters, mediaList, tx, txPair } from './tamrna';
 
 /**
  * Orders + dashboard KPIs of the Tamrna backend (Postman collection `tomorona`: `GET /admin/orders`, `GET /admin/orders/{id}`,
@@ -111,8 +111,9 @@ function toOrder(o) {
   };
 }
 
-export async function listOrders() {
-  const rows = await fetchAll(e.orders.list);
+/** @param {{ status?: string, payment_status?: 'paid' | 'pending', delivery_type?: 'branch' | 'delivery' | 'private' }} [opts] sent as filters[...] */
+export async function listOrders(opts = {}) {
+  const rows = await fetchAll(e.orders.list, listFilters({ filters: opts }));
   return rows.map(toOrder).sort((a, b) => b.id - a.id);
 }
 

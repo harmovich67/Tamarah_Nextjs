@@ -2,7 +2,7 @@ import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { ApiError, ERROR_CODES } from '@tamrna/shared/api';
 import { toFormData, unwrap } from './helpers';
-import { fetchAllBilingual, isOn, mediaOf, tx, uploadMedia, withFormErrors } from './tamrna';
+import { fetchAllBilingual, isOn, listFilters, mediaOf, tx, uploadMedia, withFormErrors } from './tamrna';
 
 /** Laravel adapter for the homepage CMS (same function names / shapes as adapters/mock/home.js). */
 export const getHomeContent = async () => unwrap(await api.get(e.homeSections)); // -> { sections, banners }
@@ -54,8 +54,8 @@ async function withTranslations(row) {
   return { ...row, ...full };
 }
 
-export async function listBanners() {
-  const rows = await fetchAllBilingual(e.banners.list);
+export async function listBanners(filters) {
+  const rows = await fetchAllBilingual(e.banners.list, listFilters(filters));
   return (await Promise.all(rows.map(withTranslations))).map(toBanner).sort((a, b) => a.order_index - b.order_index || a.id - b.id);
 }
 

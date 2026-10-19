@@ -1,7 +1,7 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { toFormData, unwrap } from './helpers';
-import { fetchAll, fetchAllBilingual, isOn, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
+import { fetchAll, fetchAllBilingual, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
 
 /**
  * Laravel adapter for the store-management domain (same function names / shapes as adapters/mock/store.js).
@@ -33,7 +33,7 @@ function toCategory(c) {
   };
 }
 
-export const listCategories = async () => (await fetchAllBilingual(e.categories.list)).map(toCategory);
+export const listCategories = async (filters) => (await fetchAllBilingual(e.categories.list, listFilters(filters))).map(toCategory);
 export const getCategory = async (id) => toCategory(unwrap(await api.get(e.categories.item(id))));
 
 async function categoryBody(values) {
@@ -164,9 +164,9 @@ function toProductRow(p, categories) {
   };
 }
 
-/** @param {{ cat?: string }} [params] cat = category slug or id */
-export async function listProducts({ cat } = {}) {
-  const [products, categories] = await Promise.all([fetchAllBilingual(e.products.list), listCategories()]);
+/** @param {{ cat?: string, search?: string, is_active?: boolean }} [params] cat = category slug or id; search / is_active are sent to the backend */
+export async function listProducts({ cat, ...filters } = {}) {
+  const [products, categories] = await Promise.all([fetchAllBilingual(e.products.list, listFilters(filters)), listCategories()]);
   const rows = products.map((p) => toProductRow(p, categories));
   const wanted = cat ? categories.find((c) => c.slug === cat || String(c.id) === String(cat)) : null;
   const match = (r) => wanted && (r.category_ids.includes(wanted.id) || r.category_names.includes(wanted.name_ar) || r.category_names.includes(wanted.name_en));
