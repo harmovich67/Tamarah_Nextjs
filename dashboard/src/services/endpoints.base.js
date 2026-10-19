@@ -16,7 +16,7 @@ export default Object.freeze({
   // Uploads return a media id, which is then sent as category.image / product.gallery[].
   media: { upload: '/general/attachment', remove: (id) => `/general/attachment/delete/${id}` },
 
-  dashboard: '/admin/dashboard', //         DashboardController::index
+  dashboard: '/admin/home', //              GET ?date_filter=all|today|week|month|year|custom[&from_date&to_date]
 
   products: crud('/admin/products'), //     ProductsController
   productOptions: '/admin/products/options',
@@ -28,8 +28,7 @@ export default Object.freeze({
   categorySortOrder: '/admin/categories/sort-order', //        POST: { order[id]: position }
   warehouses: crud('/admin/warehouses'), // StructureController (warehouses)
   orders: crud('/admin/orders'), //         OrdersController
-  orderStatus: (id) => `/admin/orders/${id}/status`,
-  orderWaybill: (id) => `/admin/orders/${id}/waybill`,
+  orderAction: (id, action) => `/admin/orders/${id}/${action}`, // POST; action = process | ready | deliver | complete | cancel
 
   coupons: crud('/admin/coupons'), //       CouponsController
   couponToggle: (id) => `/admin/coupons/${id}/toggle`,
@@ -50,6 +49,31 @@ export default Object.freeze({
   customFieldTargets: '/admin/custom-fields/targets',
 
   users: crud('/admin/users'), //           UsersController
+
+  // In the Tamrna backend but without a dashboard screen yet (see README "Not wired").
+  clients: crud('/admin/clients'), //       GET ?keyword&is_active
+  clientToggleBan: (id) => `/admin/clients/${id}/toggle-ban`,
+  giftCards: crud('/admin/gift-cards'), //  { amount, sort_order, is_active }
+  giftCardStatus: (id) => `/admin/gift-cards/${id}/status`,
+  giftCardSortOrder: '/admin/gift-cards/sort-order',
+  features: crud('/admin/features'), //     GET ?filters[type]=home|principles|about|story|future
+  featureStatus: (id) => `/admin/features/${id}/status`,
+  featureSortOrder: '/admin/features/sort-order',
+  reviews: crud('/admin/reviews'),
+  reviewHide: (id) => `/admin/reviews/${id}/update-hide`,
+  sections: crud('/admin/sections'), //     type = story | future | commitment, images[]
+  systemNumbers: crud('/admin/system-numbers'),
+  systemNumberStatus: (id) => `/admin/system-numbers/${id}/status`,
+  systemNumberSortOrder: '/admin/system-numbers/sort-order',
+  branches: crud('/admin/branches'),
+  branchStatus: (id) => `/admin/branches/${id}/status`,
+  branchTogglePickup: (id) => `/admin/branches/${id}/toggle-pickup`,
+  contacts: crud('/admin/contacts'), //     read / delete only
+  cities: crud('/admin/cities'),
+  cityStatus: (id) => `/admin/cities/${id}/status`,
+  cityPrivateDelivery: (id) => `/admin/cities/${id}/update-private-delivery`,
+  productDiscountToggle: (id, variantId) => `/admin/products/${id}/variants/${variantId}/toggle-discount`,
+  productSortOrder: '/admin/products/sort-order',
 
   homeSections: '/admin/home-sections', //  HomeSectionsController
   homeSection: (id) => `/admin/home-sections/${id}`,

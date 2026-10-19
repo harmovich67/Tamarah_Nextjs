@@ -5,10 +5,9 @@ import { fetchAll, fetchAllBilingual, isOn, mediaList, mediaOf, slugPair, tx, tx
 
 /**
  * Laravel adapter for the store-management domain (same function names / shapes as adapters/mock/store.js).
- * Categories and products talk to the Tamrna backend (see ./tamrna.js for the field translation); the dashboard KPIs,
- * warehouses and orders still follow docs/API_CONTRACT.md because the backend collection does not expose them yet.
+ * Categories, products, orders and the dashboard KPIs talk to the Tamrna backend (see ./tamrna.js and ./orders.js for the
+ * field translation); warehouses and stock updates still follow docs/API_CONTRACT.md because the collection has none.
  */
-export const getDashboardStats = async () => unwrap(await api.get(e.dashboard));
 
 const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 
@@ -275,7 +274,5 @@ export const createWarehouse = async (values) => unwrap(await api.post(e.warehou
 export const updateWarehouse = async (id, values) => unwrap(await api.put(e.warehouses.item(id), values));
 export const deleteWarehouse = async (id) => api.delete(e.warehouses.item(id));
 
-export const listOrders = async () => unwrap(await api.get(e.orders.list));
-export const getOrder = async (id) => unwrap(await api.get(e.orders.item(id)));
-export const updateOrderStatus = async ({ id, ...body }) => unwrap(await api.patch(e.orderStatus(id), body));
-export const generateWaybill = async (id) => unwrap(await api.post(e.orderWaybill(id)));
+// Orders + dashboard KPIs: ./orders.js. The backend has no waybill endpoint; the screen hides the button in laravel mode.
+export { listOrders, getOrder, updateOrderStatus, deleteOrder, getDashboardStats } from './orders';

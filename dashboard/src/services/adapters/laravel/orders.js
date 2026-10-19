@@ -1,0 +1,182 @@
+import { apiClient as api } from '@/lib/apiClient';
+import { endpoints as e } from '../../endpoints';
+import { unwrap } from './helpers';
+import { fetchAll, mediaList, tx, txPair } from './tamrna';
+
+/**
+ * Orders + dashboard KPIs of the Tamrna backend (Postman collection `tomorona`: `GET /admin/orders`, `GET /admin/orders/{id}`,
+ * `POST /admin/orders/{id}/process|ready|deliver|complete|cancel`, `GET /admin/home`). The collection has no response
+ * examples, so every field is read through a list of candidate names; if a screen shows blanks compare the real response
+ * with the `pick(...)` lists below.
+ */
+
+const pick = (obj, keys, fallback = undefined) => {
+  for (const k of keys) {
+    const v = k.split('.').reduce((o, part) => (o === null || o === undefined ? undefined : o[part]), obj);
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return fallback;
+};
+const num = (obj, keys) => Number(pick(obj, keys, 0)) || 0;
+const text = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? v.name ?? v.title ?? '' : v == null ? '' : String(v));
+
+/** Backend status -> the five shipping statuses the screens know. */
+const STATUS_IN = {
+  pending: 'pending',
+  new: 'pending',
+  processing: 'pending', //  "process": the team is preparing the order
+  preparing: 'pending',
+  ready: 'processing', //    "ready": packed and ready to ship
+  delivering: 'shipped',
+  shipped: 'shipped',
+  out_for_delivery: 'shipped',
+  delivered: 'shipped', //   "deliver": handed to the courier
+  completed: 'delivered',
+  complete: 'delivered',
+  canceled: 'cancelled',
+  cancelled: 'cancelled',
+};
+/** Screen status -> backend action (POST /admin/orders/{id}/<action>). */
+const ACTION_FOR = { pending: 'process', processing: 'ready', shipped: 'deliver', delivered: 'complete', cancelled: 'cancel' };
+
+const shippingStatusOf = (o) => STATUS_IN[String(pick(o, ['status', 'order_status'], 'pending')).toLowerCase()] ?? 'pending';
+
+function customerOf(o) {
+  const c = pick(o, ['client', 'user', 'customer'], {});
+  const name = pick(c, ['full_name', 'name']) || [c.first_name, c.last_name].filter(Boolean).join(' ');
+  return {
+    name: name || pick(o, ['customer_name', 'client_name', 'name'], ''),
+    phone: String(pick(c, ['phone', 'mobile']) ?? pick(o, ['customer_phone', 'phone'], '')),
+    email: pick(c, ['email']) ?? pick(o, ['customer_email'], ''),
+  };
+}
+
+function addressOf(o) {
+  const a = pick(o, ['address', 'shipping_address'], {});
+  if (typeof a === 'string') return { city: text(pick(o, ['city'], '')), line: a };
+  const parts = [a.street, a.district, a.national_address].filter(Boolean);
+  return { city: text(pick(a, ['city', 'city_name'], '') || pick(o, ['city'], '')), line: parts.join('، ') };
+}
+
+function toItem(i, idx) {
+  const product = i.product ?? {};
+  const variant = i.variant ?? i.product_variant ?? {};
+  const name = txPair(product.id ? product : i, 'name');
+  const qty = num(i, ['quantity', 'qty']);
+  const unit = num(i, ['price', 'unit_price']) || num(variant, ['effective_price', 'base_price']);
+  const weight = variant.weight !== undefined && variant.weight !== null ? `${Number(variant.weight)} ${variant.weight_unit ?? ''}`.trim() : '';
+  return {
+    id: i.id ?? idx,
+    product_name: name.ar,
+    product_name_ar: name.ar,
+    product_name_en: name.en,
+    size_name: weight,
+    quantity: qty,
+    unit_price: unit,
+    subtotal: num(i, ['total', 'subtotal']) || unit * qty,
+    featured_image: mediaList(product.gallery?.length ? product.gallery : product.image)[0]?.url || '',
+  };
+}
+
+const itemsOf = (o) => pick(o, ['items', 'order_items', 'products'], []).map(toItem);
+
+function toOrder(o) {
+  const customer = customerOf(o);
+  const address = addressOf(o);
+  const delivery = String(pick(o, ['delivery_type', 'shipping_type'], 'delivery'));
+  const items = itemsOf(o);
+  return {
+    id: o.id,
+    order_number: String(pick(o, ['order_number', 'number', 'code', 'id'], '')),
+    created_at: String(pick(o, ['created_at', 'date'], '')),
+    customer_name: customer.name,
+    customer_phone: customer.phone,
+    customer_email: customer.email,
+    city: address.city,
+    shipping_address: address.line,
+    shipping_type: delivery === 'branch' ? 'branch_pickup' : delivery,
+    payment_method: String(pick(o, ['payment_method', 'payment.method', 'payment_type'], 'cod')),
+    payment_status: String(pick(o, ['payment_status'], 'pending')).toLowerCase(),
+    shipping_status: shippingStatusOf(o),
+    subtotal: num(o, ['subtotal', 'sub_total', 'items_total']),
+    shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
+    discount: num(o, ['discount', 'discount_amount', 'coupon_discount']),
+    total: num(o, ['total', 'grand_total', 'total_price', 'amount']),
+    notes: pick(o, ['notes', 'note'], ''),
+    tracking_number: pick(o, ['tracking_number'], ''),
+    waybill_id: pick(o, ['waybill_id'], ''),
+    items_count: items.length || num(o, ['items_count']),
+    items_summary: [...new Set(items.map((i) => i.product_name).filter(Boolean))].join('، '),
+    _items: items,
+  };
+}
+
+export async function listOrders() {
+  const rows = await fetchAll(e.orders.list);
+  return rows.map(toOrder).sort((a, b) => b.id - a.id);
+}
+
+export async function getOrder(id) {
+  const raw = unwrap(await api.get(e.orders.item(id)));
+  const order = toOrder(raw);
+  const { _items: items, ...rest } = order;
+  return { order: { ...rest, subtotal: rest.subtotal || items.reduce((s, i) => s + i.subtotal, 0) }, items };
+}
+
+/**
+ * The backend changes the status through one POST per step instead of a status field. `payment_status` cannot be changed
+ * from here (the collection has no endpoint), so only `shipping_status` is sent.
+ */
+export async function updateOrderStatus({ id, shipping_status }) {
+  const action = ACTION_FOR[shipping_status];
+  if (!action) return getOrder(id).then(({ order }) => ({ order }));
+  const current = await getOrder(id);
+  if (current.order.shipping_status !== shipping_status) await api.post(e.orderAction(id, action));
+  return getOrder(id).then(({ order }) => ({ order }));
+}
+
+export const deleteOrder = async (id) => api.delete(e.orders.item(id));
+
+// ------------------------------------------------------------------------------------------------ dashboard
+/**
+ * `GET /admin/home?date_filter=all|today|week|month|year|custom[&from_date&to_date]`. KPI / list names are not in the
+ * collection, hence the candidate lists.
+ */
+export async function getDashboardStats({ dateFilter = 'all', from, to } = {}) {
+  const params = { date_filter: dateFilter };
+  if (dateFilter === 'custom') Object.assign(params, { from_date: from, to_date: to });
+  const d = unwrap(await api.get(e.dashboard, params)) || {};
+  const stats = pick(d, ['statistics', 'stats', 'counts', 'totals'], d);
+
+  const recent = pick(d, ['recent_orders', 'latest_orders', 'orders'], []);
+  const low = pick(d, ['low_stock', 'low_stock_variants', 'low_stock_products'], []);
+  const categories = pick(d, ['categories', 'categories_count', 'top_categories'], []);
+
+  return {
+    totalSales: num(stats, ['total_sales', 'sales', 'revenue', 'total_revenue', 'total_amount']),
+    totalOrders: num(stats, ['total_orders', 'orders_count', 'orders']),
+    totalProducts: num(stats, ['total_products', 'products_count', 'products']),
+    totalCustomers: num(stats, ['total_customers', 'total_clients', 'clients_count', 'customers_count', 'clients']),
+    recentOrders: Array.isArray(recent) ? recent.map(toOrder) : [],
+    lowStockVariants: Array.isArray(low)
+      ? low.map((v) => {
+          const product = v.product ?? v;
+          const name = txPair(product, 'name');
+          return {
+            id: v.id,
+            product_name_ar: name.ar,
+            product_name_en: name.en,
+            featured_image: mediaList(product.gallery?.length ? product.gallery : product.image)[0]?.url || '',
+            size_name: v.weight !== undefined && v.weight !== null ? `${Number(v.weight)} ${v.weight_unit ?? ''}`.trim() : '',
+            stock_quantity: Number(v.stock ?? v.stock_quantity ?? 0),
+          };
+        })
+      : [],
+    categoriesCount: Array.isArray(categories)
+      ? categories.map((c) => {
+          const name = txPair(c, 'name');
+          return { name_ar: name.ar, name_en: name.en, slug: tx(c, 'slug', 'en') || tx(c, 'slug', 'ar'), products_count: num(c, ['products_count', 'count']) };
+        })
+      : [],
+  };
+}

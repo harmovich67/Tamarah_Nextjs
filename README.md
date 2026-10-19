@@ -76,8 +76,8 @@ Checkout / payment, accounts and login, coupons, menus, settings and the hero sl
 
 ### Tamrna backend (Postman collection `tomorona`) — dashboard
 
-The dashboard is wired to the real backend for **login, categories, products and homepage banners** (`dashboard/.env.local`: `VITE_API_MODE=laravel`, `VITE_API_URL`).
-Everything else (orders, coupons, settings, homepage sections…) has no endpoints in the collection yet, so it keeps running on mock data
+The dashboard is wired to the real backend for **login, categories, products, homepage banners, orders and the home KPIs** (`dashboard/.env.local`: `VITE_API_MODE=laravel`, `VITE_API_URL`).
+Everything else (warehouses, coupons, settings, homepage sections…) has no endpoints in the collection yet, so it keeps running on mock data
 while `VITE_MOCK_FALLBACK=true`; the list lives in `dashboard/src/services/index.js` (`NOT_IN_BACKEND`).
 
 * Field translation (`en[name]`/`ar[name]`, media ids, variants) is in `dashboard/src/services/adapters/laravel/tamrna.js` and `store.js`.
@@ -85,8 +85,11 @@ while `VITE_MOCK_FALLBACK=true`; the list lives in `dashboard/src/services/index
 * Images are uploaded first through `POST /general/attachment` (`model`: `Category` / `Product`), then the returned id is sent.
 * Banners: title/badge/subtitle map to the backend `title`/`name`/`description` plus `placement`; the backend has no button text or link, so those fields are hidden in laravel mode. Checked on the live server (2026-10-18): the backend rejects an update without `image` and **deletes the current image when its own id is sent back**, so editing a banner requires choosing a new image (the dashboard enforces it).
 * Product stock: the form sends `is_box` and either a product-level `stock` (`is_box = 0`) or `variants[i][stock]` (`is_box = 1`), as in the Postman collection. The live backend currently ignores all three (they come back `null`, even with a raw curl), so stock is not saved until the backend implements it. Banner `name` / `description` are stored as `null` on create for the same reason.
+* Orders (`dashboard/src/services/adapters/laravel/orders.js`): `GET /admin/orders` (+ `/{id}`), and the status moves through one POST per step — `process`, `ready`, `deliver`, `complete`, `cancel` — mapped to the five shipping statuses of the order screen (pending = process, processing = ready, shipped = deliver, delivered = complete). The backend has no payment-status or waybill endpoint, so those controls are hidden in laravel mode. KPIs come from `GET /admin/home?date_filter=all|today|week|month|year|custom`.
+* **Not verified against the live server**: the collection has no response examples, so the order / KPI field names are read through candidate lists (`pick([...])` in `orders.js`). If the orders screen or the home KPIs show blanks, compare the real JSON with those lists.
+* Collection quirk: the product `availability` request posts to `/admin/products/{id}/published` (same URL as "toggle published"), so there is no separate availability endpoint to wire yet.
 * Lists are fetched twice (`Accept-Language: ar` and `en`) and merged, because the backend answers in one language per request.
-* Not wired (no UI yet): category/product sort-order, product availability toggles, admin clients, gift cards, features, sections, system numbers, branches, contacts, and the whole storefront `/client/*` API (cart, favourites, gift cards…).
+* Not wired (no UI yet; paths are already in `endpoints.base.js`): category/product sort-order, product discount toggle, admin clients (+ ban), gift cards, features, reviews, sections, system numbers, branches, contacts, cities, and the storefront `/client/*` account API (register/verify/login, profile, addresses, checkout, favourites, reviews, gift-card send).
 * The collection has no response examples, so list/show shapes are read defensively (`ar`/`en` blocks, `translations`, `name_ar`, or the plain localized value). If a screen shows blanks, compare the real response with `tamrna.js`.
 * The backend must allow CORS from `http://localhost:5173`.
 

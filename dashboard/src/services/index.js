@@ -11,7 +11,7 @@ import * as laravel from './adapters/laravel';
  * call the contract endpoints from docs/API_CONTRACT.md for them instead. Delete an entry once the backend ships it.
  */
 const NOT_IN_BACKEND = {
-  store: ['getDashboardStats', 'listWarehouses', 'createWarehouse', 'updateWarehouse', 'deleteWarehouse', 'listOrders', 'getOrder', 'updateOrderStatus', 'generateWaybill', 'updateStock'],
+  store: ['listWarehouses', 'createWarehouse', 'updateWarehouse', 'deleteWarehouse', 'generateWaybill', 'updateStock'],
   commerce: '*',
   settings: '*',
   access: '*',

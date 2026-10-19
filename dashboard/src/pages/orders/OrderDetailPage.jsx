@@ -8,7 +8,10 @@ import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { storeService } from '@/services';
+import { config } from '@/lib/config';
 import { assetSrc } from '../products/ProductsPage';
+
+const realBackend = config.apiMode === 'laravel';
 
 /** Order detail + status control (resources/views/admin/order_detail.php). */
 export default function OrderDetailPage() {
@@ -199,11 +202,14 @@ export default function OrderDetailPage() {
                   <option value="delivered">{tr('تم التوصيل بنجاح للعميل', 'Delivered to the customer')}</option>
                   <option value="cancelled">{tr('ملغي', 'Cancelled')}</option>
                 </SelectField>
-                <SelectField label={tr('حالة السداد والتحصيل', 'Payment & collection status')} className="[&_label]:text-xs [&_label]:font-black" {...register('payment_status')}>
-                  <option value="pending">{tr('معلق (بانتظار الدفع أو التحصيل عند الاستلام)', 'Pending (awaiting payment or COD collection)')}</option>
-                  <option value="paid">{tr('مدفوع ومحصل بنجاح', 'Paid and collected')}</option>
-                  <option value="failed">{tr('فشل في السداد', 'Payment failed')}</option>
-                </SelectField>
+                {/* The Tamrna backend only moves the shipping status (process / ready / deliver / complete / cancel). */}
+                {!realBackend && (
+                  <SelectField label={tr('حالة السداد والتحصيل', 'Payment & collection status')} className="[&_label]:text-xs [&_label]:font-black" {...register('payment_status')}>
+                    <option value="pending">{tr('معلق (بانتظار الدفع أو التحصيل عند الاستلام)', 'Pending (awaiting payment or COD collection)')}</option>
+                    <option value="paid">{tr('مدفوع ومحصل بنجاح', 'Paid and collected')}</option>
+                    <option value="failed">{tr('فشل في السداد', 'Payment failed')}</option>
+                  </SelectField>
+                )}
                 <Button type="submit" loading={update.isPending} icon="check" className="w-full justify-center">
                   {tr('حفظ التحديثات', 'Save updates')}
                 </Button>
@@ -217,7 +223,7 @@ export default function OrderDetailPage() {
                     {order.waybill_id ? <div>{tr('رقم البوليصة: ', 'Waybill: ')}<b dir="ltr" className="font-mono">{order.waybill_id}</b></div> : null}
                   </div>
                 ) : null}
-                {can('orders.waybill') && (
+                {can('orders.waybill') && !realBackend && (
                   <Button variant="outline" icon="rocket" loading={waybill.isPending} onClick={() => waybill.mutate()} className="w-full justify-center">
                     {order.tracking_number ? tr('إعادة إصدار بوليصة الشحن المبرد', 'Re-issue cold-chain waybill') : tr('إصدار بوليصة الشحن المبرد', 'Issue cold-chain waybill')}
                   </Button>
