@@ -87,7 +87,10 @@ export function createApiClient(options) {
 
   function toApiError(status, body) {
     const message = (body && typeof body === 'object' && body.message) || `HTTP ${status}`;
-    const errors = (body && typeof body === 'object' && body.errors) || {};
+    let errors = (body && typeof body === 'object' && body.errors) || {};
+    // The Tamrna backend sends validation errors as `data: { field: [messages] }` (no `errors` key).
+    const d = body && typeof body === 'object' ? body.data : null;
+    if (!Object.keys(errors).length && status === 422 && d && typeof d === 'object' && !Array.isArray(d) && Object.values(d).every(Array.isArray)) errors = d;
     let code = ERROR_CODES.HTTP;
     if (status === 401) code = ERROR_CODES.SESSION_EXPIRED;
     else if (status === 403) code = ERROR_CODES.FORBIDDEN;

@@ -124,6 +124,20 @@ export async function verifyOtp({ phone, otp }) {
   return sessionFor(db.find('users', row.id));
 }
 
+/** Wrong mobile typed at registration: move the unverified account to the new number and send a new code. */
+export async function changePhone({ phone, newPhone }) {
+  await latency(250);
+  const from = cleanSaudiPhone(phone);
+  const to = cleanSaudiPhone(newPhone);
+  if (to.length < 9) fail(t('يرجى إدخال رقم جوال سعودي صحيح (مثال: 0555123456)', 'Enter a valid Saudi mobile number'), 422, { phone: [t('رقم الجوال غير صحيح', 'Invalid mobile number')] });
+  const row = db.all('users').find((u) => u.phone === from && u.phone_verified !== 1);
+  if (!row) fail(t('الحساب غير موجود أو تم توثيقه بالفعل', 'Account does not exist or is already verified'), 422);
+  if (db.all('users').some((u) => u.phone === to && u.id !== row.id)) fail(t('هذا الرقم مسجل بالفعل', 'This number is already registered'), 422);
+  db.update('users', row.id, { phone: to });
+  issueOtp(to);
+  return { phone: newPhone };
+}
+
 export async function resendOtp({ phone }) {
   await latency(250);
   return issueOtp(cleanSaudiPhone(phone));

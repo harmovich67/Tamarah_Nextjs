@@ -45,7 +45,7 @@ export async function register(input) {
     last_name: input.last,
     email: String(input.email || '').trim() || undefined,
     phone,
-    phone_code: PHONE_CODE,
+    phone_code: input.phone_code || PHONE_CODE,
     password: input.password,
     password_confirmation: input.confirm ?? input.password,
     ...DEVICE,
@@ -59,6 +59,8 @@ export async function register(input) {
 export async function verifyOtp({ phone, otp }) {
   const reset = pendingReset;
   if (reset && reset.phone === phone) {
+    // Same order as the collection: confirm the code (/client/verify), then set the new password with it.
+    await api.post('/client/verify', form({ auth: localPhone(phone), code: otp, phone_code: PHONE_CODE, ...DEVICE }), CLIENT);
     await api.post(
       '/client/reset-password',
       form({ phone_code: PHONE_CODE, auth: localPhone(phone), password: reset.password, password_confirmation: reset.password, code: otp }),
@@ -72,6 +74,16 @@ export async function verifyOtp({ phone, otp }) {
     CLIENT,
   );
   return sessionFrom(res, { phone: localPhone(phone) });
+}
+
+/** Registration typed a wrong mobile: `POST /client/change-phone-before-verify` moves the unverified account to the new number (the registration data stays). */
+export async function changePhone({ phone, newPhone }) {
+  await api.post(
+    '/client/change-phone-before-verify',
+    form({ current_phone: localPhone(phone), current_phone_code: PHONE_CODE, new_phone: localPhone(newPhone), new_phone_code: PHONE_CODE }),
+    CLIENT,
+  );
+  return { phone: newPhone };
 }
 
 export async function resendOtp({ phone }) {

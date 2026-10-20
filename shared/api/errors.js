@@ -78,6 +78,13 @@ const MESSAGES = {
   },
 };
 
+/** `{ success:false | status:'fail', message }` answers with a readable message (not an untranslated key such as `general.messages.x`). */
+function isBackendFailure(error) {
+  const body = error.data;
+  const flagged = body && typeof body === 'object' && (body.success === false || body.status === 'fail');
+  return !!flagged && typeof error.message === 'string' && !/^[a-z_]+(\.[a-z_]+)+$/.test(error.message);
+}
+
 /**
  * Map any thrown value to a friendly, localized message.
  * Server messages are used only for 4xx business errors that are safe to display
@@ -94,12 +101,13 @@ export function toFriendlyMessage(error, locale = 'ar') {
   const status = error.status;
   // Business 4xx replies flagged by the API ({ success:false, message }) win over generic text — e.g. "wrong password" is a 401
   // that is not a session expiry. A bare "Unauthenticated." from Laravel has no flag and falls through to the session message.
-  if ([400, 401, 403, 404, 409, 429].includes(status) && error.message && error.data?.success === false) return error.message;
+  if ([400, 401, 403, 404, 409, 429].includes(status) && error.message && isBackendFailure(error)) return error.message;
   if (error.code === ERROR_CODES.SESSION_EXPIRED) return m.session;
   if (status >= 500) return m[status] || m[500];
   if (status === 422) {
     const first = Object.values(error.errors || {}).flat()[0];
-    return first || m[422];
+    // e.g. "The code is incorrect": a 422 whose only content is the backend message.
+    return first || (isBackendFailure(error) && error.message) || m[422];
   }
   return m[status] || (error.message && status < 500 ? error.message : m.fallback);
 }

@@ -16,6 +16,10 @@ import AuthShell, { DemoNotice, PasswordInput, SocialButtons } from './AuthShell
 
 export const PENDING_PHONE_KEY = 'tamrna.web.pending_phone';
 
+/** Country codes offered next to the mobile number. Saudi Arabia is selected by default; the number itself is validated as a Saudi mobile. */
+export const PHONE_CODES = [['966', '🇸🇦 +966']];
+const DEFAULT_PHONE_CODE = PHONE_CODES[0][0];
+
 export default function RegisterForm() {
   const { locale, tr } = useLocale();
   const router = useRouter();
@@ -25,22 +29,26 @@ export default function RegisterForm() {
   const {
     register,
     handleSubmit,
+    getValues,
     setValue,
     setError,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(registerSchema(locale)),
-    defaultValues: { first: '', last: '', phone: '', email: '', password: '', confirm: '', terms: true },
+    defaultValues: { first: '', last: '', phone_code: DEFAULT_PHONE_CODE, phone: '', email: '', password: '', confirm: '', terms: true },
   });
 
   const onSubmit = async (values) => {
     setServerError('');
     try {
-      const res = await authService.register(values);
+      // `phone_code` is not part of the validation schema: read it from the form directly.
+      const res = await authService.register({ ...values, phone_code: getValues('phone_code') || DEFAULT_PHONE_CODE });
       safeStorage.set(PENDING_PHONE_KEY, res.phone);
       router.push(`/verify-otp${res.notice ? `?notice=${res.notice}` : ''}`);
     } catch (error) {
-      if (error?.errors) Object.entries(error.errors).forEach(([field, msgs]) => setError(field, { message: [].concat(msgs)[0] }));
+      // Backend field names -> form field names.
+      const FIELD = { first_name: 'first', last_name: 'last', password_confirmation: 'confirm', phone_code: 'phone' };
+      if (error?.errors) Object.entries(error.errors).forEach(([field, msgs]) => setError(FIELD[field] || field, { message: [].concat(msgs)[0] }));
       setServerError(toFriendlyMessage(error, locale));
     }
   };
@@ -75,7 +83,14 @@ export default function RegisterForm() {
           </div>
 
           <FormField id="auth-phone" label={tr('رقم الجوال', 'Mobile number')} required error={errors.phone?.message}>
-            <div className="auth-input-wrap">{icon('phone')}<input id="auth-phone" type="tel" dir="ltr" inputMode="tel" autoComplete="tel" className="input" placeholder="05xxxxxxxx" maxLength={20} aria-invalid={errors.phone ? 'true' : undefined} {...register('phone')} /></div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }} dir="ltr">
+              <select className="input select" aria-label={tr('رمز الدولة', 'Country code')} style={{ flex: '0 0 auto', width: 'auto', minWidth: 112 }} {...register('phone_code')}>
+                {PHONE_CODES.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <div className="auth-input-wrap" style={{ flex: 1 }}>{icon('phone')}<input id="auth-phone" type="tel" dir="ltr" inputMode="tel" autoComplete="tel" className="input" placeholder="05xxxxxxxx" maxLength={20} aria-invalid={errors.phone ? 'true' : undefined} {...register('phone')} /></div>
+            </div>
           </FormField>
 
           <FormField id="auth-email" label={tr('البريد الإلكتروني (اختياري)', 'Email address (optional)')} error={errors.email?.message}>
