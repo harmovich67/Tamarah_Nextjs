@@ -26,6 +26,10 @@ export const PERMISSIONS = Object.freeze({
   'products.delete': 'store_manager',
   'stock.update': 'store_manager',
 
+  // Tamrna backend resources (gift cards, features, branches, cities, clients, reviews...): laravel mode only.
+  'resources.view': 'store_manager',
+  'resources.manage': 'store_manager',
+
   'orders.view': 'store_manager',
   'orders.update': 'store_manager',
   'orders.waybill': 'store_manager',

@@ -142,13 +142,15 @@ export default function AdminLayout() {
         {/* Nav list */}
         <nav className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-1.5 sidebar-scroll">
           {NAV.map((group, gi) => {
-            const items = group.items.filter((i) => !i.permission || can(i.permission));
+            // Backend-only screens exist in laravel mode; the storefront gift-card link is a demo-mode shortcut.
+            if (group.backendOnly && config.apiMode !== 'laravel') return null;
+            const items = group.items.filter((i) => (!i.permission || can(i.permission)) && !(i.mockOnly && config.apiMode === 'laravel'));
             if (!items.length) return null;
             return (
               <div key={gi} className="space-y-1">
-                {group.titleKey ? (
+                {group.titleKey || group.title ? (
                   <div className="pt-3 pb-1">
-                    <p className="px-3.5 text-[10px] font-bold uppercase tracking-wider text-amber-400/80">{t(group.titleKey)}</p>
+                    <p className="px-3.5 text-[10px] font-bold uppercase tracking-wider text-amber-400/80">{group.titleKey ? t(group.titleKey) : tr(group.title[0], group.title[1])}</p>
                   </div>
                 ) : null}
                 {items.map((item) => {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Icon } from '@tamrna/shared/components/Icon';
 import { useLocale } from '@/components/LocaleProvider';
 import { asset } from '@/lib/asset';
+import { config } from '@/lib/config';
 
 /** Decorative storytelling side of the auth screens (components/auth_story.php + auth_label.php). */
 function AuthStory() {
@@ -123,6 +124,8 @@ export function SocialButtons({ onUnavailable }) {
 
 export function DemoNotice() {
   const { tr } = useLocale();
+  // Demo-only text: nothing is local once the storefront talks to the real backend.
+  if (config.apiMode === 'laravel') return null;
   return (
     <p className="auth-demo-notice">
       {tr('وضع تجربة محلي: استخدم بيانات اختبار فقط. لا تُرسل رسائل SMS، وتُحفظ الحسابات في هذا المتصفح فقط.', 'Local preview: use test data only. No SMS is sent. Accounts are stored in this browser only.')}

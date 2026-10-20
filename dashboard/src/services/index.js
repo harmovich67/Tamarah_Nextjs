@@ -49,3 +49,7 @@ export const accessService = pick('access');
 export const cmsService = pick('cms');
 export const homeService = pick('home');
 export const systemService = pick('system');
+
+// Simple admin resources that exist only in the Tamrna backend (gift cards, features, branches, cities, clients, reviews...).
+// Their screens and menu entries are shown in laravel mode only.
+export const resourceService = config.apiMode === 'laravel' ? laravel.resources : null;

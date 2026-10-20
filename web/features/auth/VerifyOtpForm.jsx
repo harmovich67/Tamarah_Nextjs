@@ -98,9 +98,11 @@ function Form() {
             <input id="auth-code" className="input otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={OTP.LENGTH} dir="ltr" placeholder="······" value={code} onChange={onChange} autoFocus />
           </FormField>
 
-          <p className="auth-demo-code">
-            {tr('رمز التجربة', 'Preview code')}: <bdi>{OTP.DEMO_CODE}</bdi>
-          </p>
+          {config.apiMode !== 'laravel' ? (
+            <p className="auth-demo-code">
+              {tr('رمز التجربة', 'Preview code')}: <bdi>{OTP.DEMO_CODE}</bdi>
+            </p>
+          ) : null}
 
           <button type="submit" className="button button--primary auth-submit">
             {tr('تأكيد الرمز', 'Verify code')}

@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { numberFormat } from '@tamrna/shared/utils';
-import { Button, ErrorState, Icon, PageLoading, SelectField, cx } from '@/components/ui';
+import { Button, ConfirmDialog, ErrorState, Icon, PageLoading, SelectField, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -19,6 +19,8 @@ export default function OrderDetailPage() {
   const { tr, currency } = useT();
   const { can } = usePermissions();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['order', id], queryFn: () => storeService.getOrder(id) });
+  const navigate = useNavigate();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { register, reset, handleSubmit } = useForm({ defaultValues: { shipping_status: 'pending', payment_status: 'pending' } });
 
   useEffect(() => {
@@ -28,6 +30,11 @@ export default function OrderDetailPage() {
   const update = useAdminMutation((v) => storeService.updateOrderStatus({ id, ...v }), {
     invalidate: [['order', id], ['orders'], ['dashboard']],
     success: tr('تم تحديث حالة الطلب بنجاح', 'Order status updated'),
+  });
+  const remove = useAdminMutation(() => storeService.deleteOrder(id), {
+    invalidate: [['orders'], ['dashboard']],
+    success: tr('تم حذف الطلب', 'Order deleted'),
+    onSuccess: () => navigate('/orders'),
   });
   const waybill = useAdminMutation(() => storeService.generateWaybill(id), {
     invalidate: [['order', id], ['orders']],
@@ -64,6 +71,12 @@ export default function OrderDetailPage() {
             <Icon name="printer" className="w-4 h-4 text-gold-300" />
             <span>{tr('طباعة الفاتورة', 'Print invoice')}</span>
           </button>
+          {realBackend && can('orders.update') && (
+            <button type="button" onClick={() => setConfirmDelete(true)} className="px-5 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-2xl text-sm font-bold flex items-center gap-2 transition">
+              <Icon name="trash-2" className="w-4 h-4" />
+              <span>{tr('حذف الطلب', 'Delete order')}</span>
+            </button>
+          )}
           <Link to="/orders" className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold flex items-center gap-2 transition">
             <Icon name="arrow-right" className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
             <span>{tr('العودة للطلبات', 'Back to orders')}</span>
@@ -233,6 +246,14 @@ export default function OrderDetailPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => remove.mutate()}
+        loading={remove.isPending}
+        message={tr('هل أنت متأكد من حذف هذا الطلب نهائياً؟', 'Are you sure you want to permanently delete this order?')}
+        confirmLabel={tr('حذف', 'Delete')}
+      />
     </div>
   );
 }

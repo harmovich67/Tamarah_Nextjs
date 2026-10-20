@@ -3,6 +3,23 @@
  * only); `external: 'storefront'` links to the public site. Entries marked `extra` exist in the PHP routes but
  * were not linked from the legacy sidebar; they are listed so every migrated screen stays reachable.
  */
+/** Screens of the Tamrna backend that have no counterpart in the mock database: shown in laravel mode only. */
+const BACKEND_NAV = {
+  title: ['بيانات المتجر (الباك اند)', 'Store data (backend)'],
+  backendOnly: true,
+  items: [
+    { to: '/clients', icon: 'users', label: ['العملاء', 'Clients'], permission: 'resources.view' },
+    { to: '/reviews', icon: 'star', label: ['التقييمات', 'Reviews'], permission: 'resources.view' },
+    { to: '/gift-cards', icon: 'gift', label: ['بطاقات الهدايا', 'Gift cards'], permission: 'resources.view' },
+    { to: '/branches', icon: 'store', label: ['الفروع', 'Branches'], permission: 'resources.view' },
+    { to: '/cities', icon: 'map-pin', label: ['المدن', 'Cities'], permission: 'resources.view' },
+    { to: '/features', icon: 'sparkles', label: ['المميزات', 'Features'], permission: 'resources.view' },
+    { to: '/sections', icon: 'layout-panel-top', label: ['أقسام المحتوى', 'Content sections'], permission: 'resources.view' },
+    { to: '/system-numbers', icon: 'hash', label: ['أرقام النظام', 'System numbers'], permission: 'resources.view' },
+    { to: '/contacts', icon: 'mail', label: ['رسائل التواصل', 'Contact messages'], permission: 'resources.view' },
+  ],
+};
+
 export const NAV = [
   { items: [{ to: '/', icon: 'layout-dashboard', labelKey: 'admin_dashboard', permission: 'dashboard.view', end: true }] },
   {
@@ -15,7 +32,7 @@ export const NAV = [
       { to: '/coupons', icon: 'ticket', labelKey: 'admin_nav_coupons', permission: 'coupons.view' },
       { to: '/shipping-zones', icon: 'map-pin', labelKey: 'admin_nav_shipping', permission: 'shipping.view' },
       { to: '/settings', icon: 'credit-card', labelKey: 'admin_nav_payments', permission: 'payments.view' },
-      { external: 'storefront', href: '/gift-cards', icon: 'gift', labelKey: 'admin_nav_gift_cards' },
+      { external: 'storefront', href: '/gift-cards', icon: 'gift', labelKey: 'admin_nav_gift_cards', mockOnly: true },
     ],
   },
   {
@@ -40,4 +57,5 @@ export const NAV = [
       { to: '/backup', icon: 'database', labelKey: 'admin_nav_backup', permission: 'backup.view' },
     ],
   },
+  BACKEND_NAV,
 ];

@@ -64,15 +64,16 @@ Existing files get a `.bak` copy. Details of what the backend must provide are i
 
 ### Tamrna backend — storefront (`web/`)
 
-With `NEXT_PUBLIC_API_MODE=laravel` (`web/.env.local`) the storefront shows what the dashboard saves: **catalog, product pages, home-page products / categories and the guest cart** come from `/client/*` (`web/services/adapters/tamrna/index.js`, wired in `web/services/index.js`).
-Checkout / payment, accounts and login, coupons, menus, settings and the hero slider stay on mock data (the backend has none of these yet; `NEXT_PUBLIC_MOCK_FALLBACK=false` disables the fallback).
+With `NEXT_PUBLIC_API_MODE=laravel` (`web/.env.local`) the storefront runs on the real backend (`web/services/adapters/tamrna/`, wired in `web/services/index.js`):
 
-* Product URLs are `/product/<id>-<slug>`: the backend slug is not unique, so the id in front makes the lookup exact.
-* Categories are derived from the products (a category with no product is not listed) until `GET /client/departments` works; it currently answers 500 (`banners.sort_order` column missing on the server, same for `/client/about` and `/client/gift-cards`).
-* Product list / categories are cached 30 s per server process, so a change made in the dashboard shows up within half a minute.
-* The backend cart returns `price: "0.00"` for every line, so the adapter reads the price from the product. Guests are identified by a random `guest_token` kept in the browser.
-* `POST /client/contact` answers 401 for guests (checked on the live server), so the contact form shows a clear error until the backend allows it.
-* Stock is not saved by the backend yet, so a purchasable product counts as in stock.
+* **Catalog, product pages, home products / categories / hero slides** (`/client/products`, `/client/departments`, `/client/home` banners; demo slides stay when no banner is published) and the **guest cart** (`/client/cart*`).
+* **Sign-in and accounts** (`auth.js`): login `POST /client/login` (mobile + password, `?guest_token` merges the guest cart), registration + OTP (`/client/register`, `/client/verify`, `/client/resend-otp`), forgot password (`/client/forget-password` → `/client/reset-password`; the form asks for the new password up front because the backend takes it with the first request), logout. There is no "sign in with a code only" flow.
+* **Account** (`account.js`): profile + password (`/client/profile`), addresses (`/client/addresses`, cities from `GET /general/cities`), orders (`/client/orders`), favourites (`/client/favorites`), notifications (`/general/notifications`), order reviews (`POST /client/reviews`, shown on delivered orders).
+* **Checkout** (`checkout.js`): `POST /client/orders/checkout { address_id, delivery_type }`; sign-in is required. The backend has no payment, shipping-quote or single-order endpoint, so the only payment method is "pay on delivery / at the branch", the shipping fee is shown once the order exists, and an order is looked up in the customer's order list. Gift cards are sent straight away with `POST /client/gift-cards`.
+* Still on demo data: coupons, menus, settings, newsletter, customer-side order cancellation (no endpoint), received gift cards, preferences (kept in the browser).
+* Server-side problems seen on the live backend (2026-10-19): `GET /client/about` and `GET /client/gift-cards` answer 500 (`banners.sort_order` column missing); `POST /client/contact` answers 401 for guests.
+* Response shapes of the authenticated endpoints were **not verified** against the live server (the collection has no examples): fields are read through candidate lists (`pick(...)` in `http.js`); if a screen shows blanks compare the real JSON with them.
+* Product URLs are `/product/<id>-<slug>` (the backend slug is not unique); product list / categories are cached 30 s per server process.
 
 ### Tamrna backend (Postman collection `tomorona`) — dashboard
 
@@ -90,7 +91,8 @@ while `VITE_MOCK_FALLBACK=true`; the list lives in `dashboard/src/services/index
 * Collection quirk: the product `availability` request posts to `/admin/products/{id}/published` (same URL as "toggle published"), so there is no separate availability endpoint to wire yet.
 * List filters: the list endpoints accept `?search=` and `?filters[is_active]=0|1` (categories, products, banners; orders take `filters[status]`, `filters[payment_status]`, `filters[delivery_type]`). The adapters expose them (`listCategories({ search, is_active })`, `listProducts({ cat, search, is_active })`, `listBanners(...)`, `listOrders({ status, ... })`) but send nothing by default, so the screens still get every row and filter client side.
 * Lists are fetched twice (`Accept-Language: ar` and `en`) and merged, because the backend answers in one language per request.
-* Not wired (no UI yet; paths are already in `endpoints.base.js`): category/product sort-order, product discount toggle, admin clients (+ ban), gift cards, features, reviews, sections, system numbers, branches, contacts, cities, and the storefront `/client/*` account API (register/verify/login, profile, addresses, checkout, favourites, reviews, gift-card send).
+* Generic backend screens (laravel mode only, sidebar group "Store data (backend)"): clients (search / ban / delete), reviews (hide / delete), gift cards, branches (+ toggle pickup), cities (+ private delivery), features, content sections, system numbers and contact messages. One factory (`services/adapters/laravel/resources.js`) and one screen (`pages/resources/ResourcePage.jsx`, fields in `pages/resources/configs.jsx`) serve all of them. Orders can also be deleted from the order page.
+* Not wired: category / product sort-order UI, product `status` and variant `toggle-discount` switches, media delete / `models/list`, `/general` change-lang.
 * The collection has no response examples, so list/show shapes are read defensively (`ar`/`en` blocks, `translations`, `name_ar`, or the plain localized value). If a screen shows blanks, compare the real response with `tamrna.js`.
 * The backend must allow CORS from `http://localhost:5173`.
 

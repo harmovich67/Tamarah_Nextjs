@@ -271,7 +271,41 @@ export async function getProductsByIds(ids = []) {
 export async function realHomeParts() {
   const { products, categories } = await loadBase();
   const ordered = products.slice().sort(SORTERS.featured);
-  return { categories, products: ordered.slice(0, 8), preorderProducts: products.filter((p) => p.is_preorder), bestsellers: [] };
+  const parts = { categories, products: ordered.slice(0, 8), preorderProducts: products.filter((p) => p.is_preorder), bestsellers: [] };
+  const banners = await realBanners();
+  // Hero slides come from the dashboard banners (placement `home`); with none published the demo slides stay.
+  return banners.length ? { ...parts, banners } : parts;
+}
+
+/** `GET /client/home` -> hero slides (`title` / `name` / `description` + image), merged ar + en. */
+async function realBanners() {
+  try {
+    const [ar, en] = await Promise.all([
+      cached('home:ar', CATALOG_TTL, () => getData('/client/home', undefined, 'ar')),
+      cached('home:en', CATALOG_TTL, () => getData('/client/home', undefined, 'en').catch(() => null)),
+    ]);
+    const enById = new Map((en?.banners || []).map((b) => [b.id, b]));
+    return (ar?.banners || []).map((b, i) => {
+      const e = enById.get(b.id) || b;
+      return {
+        id: b.id,
+        badge_ar: b.name || '',
+        badge_en: e.name || b.name || '',
+        title_ar: b.title || '',
+        title_en: e.title || b.title || '',
+        subtitle_ar: b.description || '',
+        subtitle_en: e.description || b.description || '',
+        cta_ar: '',
+        cta_en: '',
+        link: '/catalog',
+        image: imageOf(b.image),
+        status: 'active',
+        order_index: b.sort_order ?? i + 1,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function realSitemapParts() {
@@ -422,6 +456,10 @@ export async function applyCoupon() {
 export async function removeCoupon() {
   return { cart: await getCart() };
 }
-export async function addGiftCard() {
-  throw unsupported(t('بطاقات الإهداء غير متاحة في السلة حالياً', 'Gift cards cannot be added to the cart yet'));
-}
+// Gift cards are sent straight away by POST /client/gift-cards (see ./checkout.js); there are no coupons in the cart.
+export { addGiftCard } from './checkout';
+
+// Customer side of the backend: sign-in, account and checkout.
+export * as auth from './auth';
+export * as account from './account';
+export * as checkout from './checkout';

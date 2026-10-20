@@ -6,5 +6,6 @@ import * as access from './access';
 import * as cms from './cms';
 import * as home from './home';
 import * as system from './system';
+import { resources } from './resources';
 
-export { auth, store, commerce, settings, access, cms, home, system };
+export { auth, store, commerce, settings, access, cms, home, system, resources };

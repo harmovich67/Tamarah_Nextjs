@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AdminLayout from '@/layouts/AdminLayout';
 import { RequireAuth, RequirePermission } from './guards';
 import { PageLoading } from '@/components/ui';
+import { config } from '@/lib/config';
 
 /** Every screen is a lazy chunk (code splitting); the guards enforce login + permission for UX. */
 const page = (loader) => {
@@ -42,6 +43,9 @@ const Logs = page(() => import('@/pages/system/Logs'));
 const Security = page(() => import('@/pages/system/Security'));
 const Backup = page(() => import('@/pages/system/Backup'));
 const NotFound = page(() => import('@/pages/NotFound'));
+const ResourcePage = page(() => import('@/pages/resources/ResourcePage'));
+// Tamrna backend resources: route path -> key of RESOURCE_PAGES. Only registered in laravel mode.
+const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities', 'features', 'sections', 'system-numbers', 'contacts'];
 
 const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
 
@@ -86,6 +90,7 @@ export const router = createBrowserRouter(
           { path: 'logs', element: guard('logs.view', <Logs />) },
           { path: 'security', element: guard('security.view', <Security />) },
           { path: 'backup', element: guard('backup.view', <Backup />) },
+          ...(config.apiMode === 'laravel' ? RESOURCE_ROUTES.map((r) => ({ path: r, element: guard('resources.view', <ResourcePage resource={r} />) })) : []),
           // Legacy PHP URL (/admin/shipping_zones etc. were hyphenated already; keep a friendly alias)
           { path: 'admin/*', element: <Navigate to="/" replace /> },
           { path: '*', element: <NotFound /> },

@@ -11,6 +11,7 @@ import { Icon } from '@tamrna/shared/components/Icon';
 import { useLocale } from '@/components/LocaleProvider';
 import { FormField, Flash } from '@/components/ui/FormField';
 import { authService } from '@/services';
+import { config } from '@/lib/config';
 import AuthShell, { DemoNotice, PasswordInput, SocialButtons } from './AuthShell';
 
 export const PENDING_PHONE_KEY = 'tamrna.web.pending_phone';
@@ -101,7 +102,7 @@ export default function RegisterForm() {
             <p>{tr('يمكنك مراجعة الشروط والأحكام وسياسة الاستخدام من الروابط الموجودة أسفل الموقع.', 'Review the terms and conditions and usage policy from the links in the site footer.')}</p>
           </details>
 
-          <button type="button" className="button button--outline auth-demo-fill" onClick={fillDemo}>{tr('تعبئة بيانات تجريبية', 'Fill demo details')}</button>
+          {config.apiMode !== 'laravel' ? <button type="button" className="button button--outline auth-demo-fill" onClick={fillDemo}>{tr('تعبئة بيانات تجريبية', 'Fill demo details')}</button> : null}
 
           <button type="submit" className="button button--primary auth-submit">
             {tr('إنشاء الحساب', 'Create account')}

@@ -83,9 +83,11 @@ function Form() {
 
           <Link className="auth-forgot-link" href="/forgot-password">{tr('نسيت كلمة المرور؟', 'Forgot password?')}</Link>
 
-          <button type="button" className="button button--outline auth-demo-fill" onClick={() => { setValue('identity', 'demo@tamrna.test'); setValue('password', 'Tmrna2026'); }}>
-            {tr('تعبئة بيانات تجريبية', 'Fill demo details')}
-          </button>
+          {config.apiMode !== 'laravel' ? (
+            <button type="button" className="button button--outline auth-demo-fill" onClick={() => { setValue('identity', 'demo@tamrna.test'); setValue('password', 'Tmrna2026'); }}>
+              {tr('تعبئة بيانات تجريبية', 'Fill demo details')}
+            </button>
+          ) : null}
 
           <button type="submit" className="button button--primary auth-submit">
             {tr('تسجيل الدخول', 'Sign in')}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toFriendlyMessage } from '@tamrna/shared/api';
@@ -12,12 +12,48 @@ import { ErrorState, LoadingState } from '@/components/ui/States';
 import { accountService } from '@/services';
 import { showToast } from '@/store/toastStore';
 import { asset } from '@/lib/asset';
+import { config } from '@/lib/config';
 import AccountShell from './AccountShell';
 
 const STEP1 = ['pending', 'قيد المراجعة', ''];
 const STEP2 = ['processing', 'ready_for_pickup', 'confirmed', 'قيد التجهيز', 'تم التأكيد'];
 const STEP3 = ['shipped', 'out_for_delivery', 'in_transit', 'تم الشحن', 'خرج للتوصيل'];
 const STEP4 = ['delivered', 'completed', 'تم التسليم'];
+
+/** POST /client/reviews { order_id, rate, comment }: offered once an order is completed (real backend only). */
+function ReviewForm({ order }) {
+  const { locale, tr } = useLocale();
+  const [rate, setRate] = useState(5);
+  const [comment, setComment] = useState('');
+  const [sent, setSent] = useState(false);
+  const send = useMutation({
+    mutationFn: () => accountService.submitReview({ orderId: order.id, rate, comment: comment.trim() }),
+    onSuccess: () => {
+      setSent(true);
+      showToast(tr('شكراً لتقييمك!', 'Thank you for your review!'), 'success');
+    },
+    onError: (e) => showToast(toFriendlyMessage(e, locale), 'error'),
+  });
+  if (sent) return <Flash type="success">{tr('تم إرسال تقييمك. شكراً لك!', 'Your review was sent. Thank you!')}</Flash>;
+  return (
+    <section className="account-card">
+      <header><span><Icon name="star" size={21} /></span><h2>{tr('قيّم طلبك', 'Rate your order')}</h2></header>
+      <form className="account-form" onSubmit={(e) => { e.preventDefault(); send.mutate(); }}>
+        <label className="field">
+          <span>{tr('التقييم', 'Rating')}</span>
+          <select className="input select" value={rate} onChange={(e) => setRate(Number(e.target.value))}>
+            {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{'★'.repeat(n)}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>{tr('تعليقك', 'Your comment')}</span>
+          <textarea className="input" rows={3} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} />
+        </label>
+        <button type="submit" className="button button--primary" disabled={send.isPending}>{tr('إرسال التقييم', 'Send review')}</button>
+      </form>
+    </section>
+  );
+}
 
 function Body({ data: d, cancel: c }) {
   const { tr, currency } = useLocale();
@@ -70,6 +106,8 @@ function Body({ data: d, cancel: c }) {
       ) : shippingStatus === 'cancelled' ? (
         <Flash type="error" icon="alert-octagon"><strong>{tr('تم إلغاء هذا الطلب بناء على طلب العميل أو الإدارة.', 'This order has been cancelled.')}</strong></Flash>
       ) : null}
+
+      {config.apiMode === 'laravel' && shippingStatus === 'delivered' ? <ReviewForm order={order} /> : null}
 
       <div className="account-order-detail-grid">
         <section className="account-card">
