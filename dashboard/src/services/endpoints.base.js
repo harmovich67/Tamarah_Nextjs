@@ -48,7 +48,11 @@ export default Object.freeze({
   customFields: crud('/admin/custom-fields'), // FieldGroupsController
   customFieldTargets: '/admin/custom-fields/targets',
 
-  users: crud('/admin/users'), //           UsersController
+  users: crud('/admin/users'), //           UsersController (mock contract)
+  admins: crud('/admin/admins'), //         Tamrna backend: admin accounts (POST {id}/status toggles active)
+  adminStatus: (id) => `/admin/admins/${id}/status`,
+  roles: crud('/admin/roles'), //           name via en[name] / ar[name], permissions[]
+  roleList: '/admin/role-not-paginated', //  every role, unpaginated
 
   // In the Tamrna backend but without a dashboard screen yet (see README "Not wired").
   clients: crud('/admin/clients'), //       GET ?keyword&is_active

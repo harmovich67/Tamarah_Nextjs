@@ -14,7 +14,6 @@ const NOT_IN_BACKEND = {
   store: ['listWarehouses', 'createWarehouse', 'updateWarehouse', 'deleteWarehouse', 'generateWaybill', 'updateStock'],
   commerce: '*',
   settings: '*',
-  access: '*',
   cms: '*',
   system: '*',
 };

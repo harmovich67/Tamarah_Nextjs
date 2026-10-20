@@ -5,12 +5,40 @@ import content from '@/data/about.json';
 
 const ICONS = { award: 'award', fingerprint: 'fingerprint', globe: 'earth', package: 'package-check', repeat: 'refresh-ccw', heart: 'heart', leaf: 'leaf', palm: 'tree-palm', people: 'users-round', pin: 'map-pin', shield: 'shield-check', sprout: 'sprout', truck: 'truck' };
 
-/** About page (resources/views/storefront/about.php). Editorial copy lives in data/about.json (ar / en pairs). */
-export default function AboutPage({ text }) {
+/** Replace a section of the bundled copy with the backend's when it has one (`remote` = tamrna `getAbout`). */
+function withRemote(base, r) {
+  if (!r) return base;
+  const some = (v) => Array.isArray(v) && v.length > 0;
+  const c = { ...base };
+  if (r.story?.title || r.story?.description) c.story = { ...base.story, title: r.story.title || base.story.title, description: r.story.description || base.story.description, image: r.story.image || base.story.image };
+  if (some(r.pillars)) c.pillars = r.pillars;
+  if (some(r.stats)) c.stats = r.stats;
+  if (some(r.values)) c.values = r.values;
+  if (some(r.performance)) c.performance = { ...base.performance, items: r.performance };
+  if (r.sustainability?.title) {
+    c.sustainability = {
+      ...base.sustainability,
+      title: r.sustainability.title,
+      description: r.sustainability.description || base.sustainability.description,
+      image: r.sustainability.image || base.sustainability.image,
+      principles: some(r.sustainability.principles) ? r.sustainability.principles : base.sustainability.principles,
+    };
+  }
+  if (r.quality?.title) {
+    c.quality = { ...base.quality, title: r.quality.title, description: r.quality.description || base.quality.description, images: some(r.quality.images) ? r.quality.images.map((src) => ({ src, alt: r.quality.title })) : base.quality.images };
+  }
+  return c;
+}
+
+/**
+ * About page (resources/views/storefront/about.php). Editorial copy lives in data/about.json (ar / en pairs); with the real
+ * backend the story, principles, numbers, sustainability and commitment sections come from `GET /client/about`.
+ */
+export default function AboutPage({ text, remote = null }) {
   const { locale, isRtl, tr } = text;
-  const c = content;
+  const c = withRemote(content, remote);
   const t = (v) => (v && typeof v === 'object' ? v[locale] ?? v.ar ?? '' : String(v ?? ''));
-  const img = (src) => asset(`assets${src}`);
+  const img = (src) => (/^https?:\/\//.test(src) ? src : asset(`assets${src}`));
   const Ic = ({ name, size = 24 }) => <Icon name={ICONS[name] || 'sparkles'} size={size} />;
   const Arrow = ({ size = 17 }) => <Icon name="arrow-left" size={size} className="directional-arrow" />;
 

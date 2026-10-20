@@ -15,6 +15,8 @@ import { api, form, guestToken, localPhone, PHONE_CODE, t, toUser, unsupported, 
 let pendingReset = null;
 const DEVICE = { device_token: 'web', type: 'web' };
 const isEmail = (v) => String(v).includes('@');
+// The collection sends `user-type: client` on registration and code verification.
+const CLIENT = { headers: { 'user-type': 'client' } };
 
 /** `{ token, user }` from a login / verify response. */
 function sessionFrom(res, fallback) {
@@ -48,7 +50,7 @@ export async function register(input) {
     password_confirmation: input.confirm ?? input.password,
     ...DEVICE,
   });
-  await api.post('/client/register', body);
+  await api.post('/client/register', body, CLIENT);
   pendingReset = null;
   return { phone: input.phone, notice: null };
 }
@@ -67,6 +69,7 @@ export async function verifyOtp({ phone, otp }) {
   const res = await api.post(
     `/client/verify?guest_token=${encodeURIComponent(guestToken())}`,
     form({ auth: localPhone(phone), code: otp, phone_code: PHONE_CODE, ...DEVICE }),
+    CLIENT,
   );
   return sessionFrom(res, { phone: localPhone(phone) });
 }

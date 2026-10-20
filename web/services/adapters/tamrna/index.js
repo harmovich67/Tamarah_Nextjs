@@ -277,6 +277,36 @@ export async function realHomeParts() {
   return banners.length ? { ...parts, banners } : parts;
 }
 
+/**
+ * `GET /client/about` in `lang`, shaped for the About page: story, pillars, stats, values, performance numbers,
+ * sustainability and the quality / commitment gallery. Missing sections come back empty so the page keeps its default copy.
+ */
+export async function getAbout(lang = 'ar') {
+  const d = await cached(`about:${lang}`, CATALOG_TTL, () => getData('/client/about', undefined, lang));
+  const list = (v) => (Array.isArray(v) ? v : []);
+  const active = (rows) => list(rows).filter((r) => r.is_active !== false);
+  const pictures = (m) => list(m).map(imageOf).filter(Boolean);
+  const story = d?.our_story;
+  const future = d?.future;
+  const commitment = d?.commitment;
+  return {
+    story: story ? { title: story.title || '', description: story.description || '', image: pictures(story.images)[0] || '' } : null,
+    pillars: active(story?.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
+    stats: active(d?.about_features).map((f) => ({ id: f.id, label: f.title || '', value: f.description || '' })),
+    values: active(d?.principles).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
+    performance: list(d?.numbers).filter((n) => n.is_active !== false).map((n) => ({ id: n.id, value: n.number || '', title: n.title || '', description: n.description || '' })),
+    sustainability: future
+      ? {
+          title: future.title || '',
+          description: future.description || '',
+          image: pictures(future.images)[0] || '',
+          principles: active(future.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
+        }
+      : null,
+    quality: commitment ? { title: commitment.title || '', description: commitment.description || '', images: pictures(commitment.images) } : null,
+  };
+}
+
 /** `GET /client/home` -> hero slides (`title` / `name` / `description` + image), merged ar + en. */
 async function realBanners() {
   try {

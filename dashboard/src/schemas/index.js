@@ -110,7 +110,7 @@ export const userSchema = (m, { editing = false } = {}) =>
     name: z.string().trim().min(2, m('الاسم مطلوب', 'Name is required')),
     email: z.string().trim().email(m('البريد الإلكتروني غير صحيح', 'Invalid email')),
     phone: z.string().trim().default(''),
-    role_id: z.coerce.number().int().min(1).max(3),
+    role_id: z.coerce.number().int().min(1),
     status: z.enum(['active', 'pending', 'rejected']).default('active'),
     password: editing
       ? z.string().refine((v) => v === '' || v.length >= 8, m('كلمة المرور 8 أحرف على الأقل', 'Password needs at least 8 characters')).default('')

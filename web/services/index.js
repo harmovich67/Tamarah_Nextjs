@@ -38,6 +38,7 @@ const content = partial
       getHomeData: async () => ({ ...(await mock.content.getHomeData()), ...(await tamrna.realHomeParts()) }),
       getSitemapEntries: async () => ({ ...(await mock.content.getSitemapEntries()), ...(await tamrna.realSitemapParts()) }),
       sendContactMessage: tamrna.sendContactMessage,
+      getAboutData: tamrna.getAbout,
     }
   : null;
 
