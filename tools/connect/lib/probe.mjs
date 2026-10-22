@@ -158,22 +158,25 @@ export async function runProbe({ apiUrl, auth, origins, creds, onResult }) {
   }
   let loginRes;
   try {
-    loginRes = await call('POST', pick('dashboard', 'login'), { body: { identity: creds.email, password: creds.password } });
+    loginRes = await call('POST', pick('dashboard', 'login'), {
+      body: { auth: creds.email, identity: creds.email, email: creds.email, password: creds.password, device_token: 'web', type: 'web' },
+    });
   } catch (e) {
     push({ group: 'اللوحة', name: 'تسجيل الدخول', status: 'fail', detail: e.message });
     return results;
   }
   const ld = unwrap(loginRes.json) || {};
   token = ld.token || ld.access_token || ld.plainTextToken || null;
-  const user = ld.user || null;
+  const user = ld.user || (ld.email || ld.full_name ? ld : null);
   if (!loginRes.res.ok) {
     push({ group: 'اللوحة', name: 'تسجيل الدخول', status: 'fail', detail: `${describeHttp(loginRes)} — ${loginRes.json?.message || 'فشل'}`, fix: loginRes.res.status === 422 ? 'الـ API يتوقع أسماء حقول مختلفة (مثلاً email بدل identity): عدّل dashboard/src/services/adapters/laravel/auth.js.' : 'تحقق من البيانات أو من مسار login.' });
     return results;
   }
   push({ group: 'اللوحة', name: 'تسجيل الدخول', status: auth === 'token' && !token ? 'fail' : 'pass', detail: auth === 'token' ? (token ? 'استلم token' : 'لم يرجع token (توقعنا data.token)') : 'نجح (session cookie)', fix: 'ارجع { data: { token, user } } من /login.' });
-  push({ group: 'اللوحة', name: 'بيانات المستخدم (user.role_name)', status: user?.role_name ? 'pass' : 'warn', detail: user?.role_name ? `role_name = ${user.role_name}` : `الحقل غير موجود في user (${Object.keys(user || {}).join(', ') || 'لا user'}). الواجهة تحتاجه للصلاحيات.`, fix: 'أضف role_name (customer | store_manager | super_admin) أو حوّله داخل adapters/laravel/auth.js.' });
+  const roleName = user?.role_name || user?.user_type;
+  push({ group: 'اللوحة', name: 'بيانات المستخدم (user.role_name)', status: roleName ? 'pass' : 'warn', detail: roleName ? `role_name = ${roleName}` : `الحقل غير موجود في user (${Object.keys(user || {}).join(', ') || 'لا user'}). الواجهة تحتاجه للصلاحيات.`, fix: 'أضف role_name (customer | store_manager | super_admin) أو حوّله داخل adapters/laravel/auth.js.' });
 
-  const stats = ['totalSales', 'totalOrders', 'totalProducts', 'totalCustomers', 'lowStockVariants', 'recentOrders', 'categoriesCount'];
+  const stats = ['orders', 'products', 'sales'];
   const authed = [
     { key: 'me', label: 'المستخدم الحالي', keys: ['id'] },
     { key: 'dashboard', label: 'إحصائيات الداشبورد', keys: stats },

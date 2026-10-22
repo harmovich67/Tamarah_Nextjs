@@ -1,5 +1,7 @@
 {
   "login": "/admin/login",
   "logout": "/admin/logout",
-  "bannerToggle": "/admin/banners/{0}/status"
+  "bannerToggle": "/admin/banners/{0}/status",
+  "users.list": "/admin/admins",
+  "users.item": "/admin/admins/{0}"
 }

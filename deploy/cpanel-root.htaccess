@@ -1,0 +1,26 @@
+# Storefront (Next.js) on cPanel / Passenger.
+# Upload as ".htaccess" into the Document Root of tomornah.wordpress.aait-d.com
+# (next to the "admin" folder). Replace CPANELUSER with the cPanel account name,
+# and adjust the app folder (tamrna) / Node version (20) to match "Setup Node.js App".
+# Normally "Create Application" in cPanel writes this block for you.
+
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/CPANELUSER/tamrna"
+PassengerBaseURI "/"
+PassengerNodejs "/home/CPANELUSER/nodevenv/tamrna/20/bin/node"
+PassengerAppType node
+PassengerStartupFile web/server.cjs
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+SetEnv NODE_ENV production
+SetEnv NEXT_PUBLIC_API_MODE mock
+SetEnv NEXT_PUBLIC_SITE_URL https://tomornah.wordpress.aait-d.com
+SetEnv NEXT_PUBLIC_DASHBOARD_URL https://tomornah.wordpress.aait-d.com/admin
+
+# Never list folders if Passenger is not answering.
+Options -Indexes
+
+# Keep dotfiles (.env, .git) private.
+<FilesMatch "^\.(?!htaccess$)">
+  Require all denied
+</FilesMatch>

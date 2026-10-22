@@ -149,15 +149,16 @@ export async function getDashboardStats({ dateFilter = 'all', from, to } = {}) {
   const d = unwrap(await api.get(e.dashboard, params)) || {};
   const stats = pick(d, ['statistics', 'stats', 'counts', 'totals'], d);
 
-  const recent = pick(d, ['recent_orders', 'latest_orders', 'orders'], []);
+  const recent = pick(d, ['recent_orders', 'latest_orders'], []);
   const low = pick(d, ['low_stock', 'low_stock_variants', 'low_stock_products'], []);
   const categories = pick(d, ['categories', 'categories_count', 'top_categories'], []);
 
   return {
-    totalSales: num(stats, ['total_sales', 'sales', 'revenue', 'total_revenue', 'total_amount']),
-    totalOrders: num(stats, ['total_orders', 'orders_count', 'orders']),
-    totalProducts: num(stats, ['total_products', 'products_count', 'products']),
-    totalCustomers: num(stats, ['total_customers', 'total_clients', 'clients_count', 'customers_count', 'clients']),
+    totalSales: num(stats, ['sales.total', 'total_sales', 'sales', 'revenue', 'total_revenue', 'total_amount']),
+    totalOrders: num(stats, ['orders.total', 'total_orders', 'orders_count', 'orders']),
+    totalProducts: num(stats, ['products.total', 'total_products', 'products_count', 'products']),
+    totalCustomers: num(stats, ['customers.total', 'clients.total', 'total_customers', 'total_clients', 'customers_count', 'clients_count', 'customers', 'clients']),
+    lowStockCount: num(stats, ['products.low_stock', 'low_stock.total', 'low_stock_count']),
     recentOrders: Array.isArray(recent) ? recent.map(toOrder) : [],
     lowStockVariants: Array.isArray(low)
       ? low.map((v) => {

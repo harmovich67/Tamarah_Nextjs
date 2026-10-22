@@ -1,1 +1,23 @@
-{}
+{
+  "home": "/client/home",
+  "catalog": "/client/products",
+  "product": "/client/products/{0}",
+  "contact": "/client/contact",
+  "cart": "/client/cart",
+  "login": "/client/login",
+  "register": "/client/register",
+  "verifyOtp": "/client/verify",
+  "resendOtp": "/client/resend-otp",
+  "forgotPassword": "/client/forget-password",
+  "logout": "/client/logout",
+  "accountProfile": "/client/profile",
+  "accountPassword": "/client/profile/update-password",
+  "accountAddresses": "/client/addresses",
+  "accountAddress": "/client/addresses/{0}",
+  "accountAddressDefault": "/client/addresses/{0}/set-default",
+  "accountOrders": "/client/orders",
+  "accountGiftCards": "/client/gift-cards",
+  "accountNotifications": "/general/notifications",
+  "wishlist": "/client/favorites",
+  "wishlistToggle": "/client/favorites/{0}/toggle"
+}
