@@ -16,6 +16,8 @@ const BACKEND_NAV = {
     { to: '/features', icon: 'sparkles', label: ['المميزات', 'Features'], permission: 'resources.view' },
     { to: '/sections', icon: 'layout-panel-top', label: ['أقسام المحتوى', 'Content sections'], permission: 'resources.view' },
     { to: '/system-numbers', icon: 'hash', label: ['أرقام النظام', 'System numbers'], permission: 'resources.view' },
+    { to: '/notifications', icon: 'bell', label: ['إرسال الإشعارات', 'Send notifications'], permission: 'resources.view' },
+    { to: '/store-settings', icon: 'settings', label: ['إعدادات المتجر', 'Store settings'], permission: 'resources.view' },
     { to: '/contacts', icon: 'mail', label: ['رسائل التواصل', 'Contact messages'], permission: 'resources.view' },
   ],
 };

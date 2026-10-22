@@ -277,6 +277,50 @@ export async function realHomeParts() {
   return banners.length ? { ...parts, banners } : parts;
 }
 
+const truthy = (v) => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').trim().toLowerCase());
+
+/**
+ * `GET /general/settings`: public key / value settings of the backend ({ key, value, group, type }). They are exposed under
+ * their own key (e.g. `accept_gift_card_amount`) and, when filled, mapped onto the storefront's contact keys
+ * (`phone` -> contact_phone, `whats_app` -> contact_whatsapp, `support_email` -> contact_email).
+ */
+export async function realSettings() {
+  try {
+    const rows = await cached('settings', CATALOG_TTL, () => getData('/general/settings'));
+    const out = {};
+    (Array.isArray(rows) ? rows : []).forEach((r) => {
+      if (!r?.key) return;
+      out[r.key] = r.value ?? '';
+    });
+    const map = { phone: 'contact_phone', whats_app: 'contact_whatsapp', support_email: 'contact_email' };
+    Object.entries(map).forEach(([from, to]) => {
+      if (String(out[from] ?? '').trim()) out[to] = out[from];
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Gift card builder options: the preset amounts of the dashboard (`GET /client/gift-cards`) and whether a custom amount is
+ * allowed (`accept_gift_card_amount` setting: shows / hides the "Other value" button; allowed while the setting is absent).
+ */
+export async function getGiftCardOptions() {
+  const [presets, settings] = await Promise.all([
+    cached('gift-presets', CATALOG_TTL, () => getData('/client/gift-cards')).catch(() => null),
+    realSettings(),
+  ]);
+  const amounts = (Array.isArray(presets) ? presets : [])
+    .filter((p) => p.is_active !== false && Number(p.amount) > 0)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.amount) - Number(b.amount))
+    .map((p) => Number(p.amount));
+  return {
+    amounts: amounts.length ? amounts : null,
+    acceptCustomAmount: 'accept_gift_card_amount' in settings ? truthy(settings.accept_gift_card_amount) : true,
+  };
+}
+
 /**
  * `GET /client/about` in `lang`, shaped for the About page: story, pillars, stats, values, performance numbers,
  * sustainability and the quality / commitment gallery. Missing sections come back empty so the page keeps its default copy.

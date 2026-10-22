@@ -43,9 +43,10 @@ const Logs = page(() => import('@/pages/system/Logs'));
 const Security = page(() => import('@/pages/system/Security'));
 const Backup = page(() => import('@/pages/system/Backup'));
 const NotFound = page(() => import('@/pages/NotFound'));
+const StoreSettings = page(() => import('@/pages/resources/StoreSettingsPage'));
 const ResourcePage = page(() => import('@/pages/resources/ResourcePage'));
 // Tamrna backend resources: route path -> key of RESOURCE_PAGES. Only registered in laravel mode.
-const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities', 'features', 'sections', 'system-numbers', 'contacts'];
+const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities', 'features', 'sections', 'system-numbers', 'contacts', 'notifications'];
 
 const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
 
@@ -90,6 +91,7 @@ export const router = createBrowserRouter(
           { path: 'logs', element: guard('logs.view', <Logs />) },
           { path: 'security', element: guard('security.view', <Security />) },
           { path: 'backup', element: guard('backup.view', <Backup />) },
+          ...(config.apiMode === 'laravel' ? [{ path: 'store-settings', element: guard('resources.view', <StoreSettings />) }] : []),
           ...(config.apiMode === 'laravel' ? RESOURCE_ROUTES.map((r) => ({ path: r, element: guard('resources.view', <ResourcePage resource={r} />) })) : []),
           // Legacy PHP URL (/admin/shipping_zones etc. were hyphenated already; keep a friendly alias)
           { path: 'admin/*', element: <Navigate to="/" replace /> },

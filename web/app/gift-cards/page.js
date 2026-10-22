@@ -1,6 +1,7 @@
 import { getLocale } from '@/lib/locale';
 import { makeText } from '@/lib/text';
 import GiftCardBuilder from '@/features/gift/GiftCardBuilder';
+import { contentService } from '@/services';
 
 export async function generateMetadata() {
   const { tr } = makeText(await getLocale());
@@ -11,6 +12,8 @@ export async function generateMetadata() {
   };
 }
 
-export default function Page() {
-  return <GiftCardBuilder />;
+export default async function Page() {
+  // With the real backend: the dashboard's preset amounts and the `accept_gift_card_amount` switch ("Other value" button).
+  const options = (await contentService.getGiftCardOptions?.().catch(() => null)) ?? {};
+  return <GiftCardBuilder amounts={options.amounts ?? undefined} acceptCustomAmount={options.acceptCustomAmount ?? true} />;
 }

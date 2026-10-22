@@ -150,7 +150,7 @@ export default function ResourcePage({ resource }) {
           {(page.rowActions || []).filter((a) => !a.show || a.show(r)).map((a) => (
             <IconAction key={a.name} icon={a.icon} label={pair(a.label, tr)} tone={a.tone} onClick={() => act.mutate({ name: a.name, id: r.id })} />
           ))}
-          {!page.readOnly && <IconAction icon="edit-3" label={tr('تعديل', 'Edit')} onClick={() => setDialog({ open: true, row: r })} />}
+          {!page.readOnly && !page.noEdit && <IconAction icon="edit-3" label={tr('تعديل', 'Edit')} onClick={() => setDialog({ open: true, row: r })} />}
           {(!page.readOnly || page.canDelete) && <IconAction icon="trash-2" label={tr('حذف', 'Delete')} tone="danger" onClick={() => setToDelete(r)} />}
         </div>
       ),

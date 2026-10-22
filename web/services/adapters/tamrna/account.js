@@ -1,6 +1,6 @@
 import { safeStorage } from '@tamrna/shared/api';
 import { getStoredUser } from '@/lib/session';
-import { api, form, localPhone, notFound, PHONE_CODE, pick, requireUser, rowsOf, t, text, toOrder, toUser, unsupported, unwrap } from './http';
+import { api, form, localPhone, notFound, num, PHONE_CODE, pick, requireUser, rowsOf, t, text, toOrder, toUser, unsupported, unwrap } from './http';
 
 /**
  * Customer account against the Tamrna backend: profile (`/client/profile`), addresses (`/client/addresses`), orders
@@ -188,10 +188,21 @@ export async function getOverview() {
   };
 }
 
-/** Gift cards the customer received: the backend only exposes sending, so there is nothing to list. */
+/** `GET /client/my-gift-cards` -> the screen's gift cards (code, amount, balance, status...). */
 export async function listGiftCards() {
   requireUser();
-  return [];
+  return rowsOf(await api.get('/client/my-gift-cards')).map((g) => ({
+    id: g.id,
+    code: String(pick(g, ['code', 'gift_card_code'], '')),
+    card_type: pick(g, ['redemption_type', 'card_type', 'type'], 'digital') === 'printed' ? 'printed' : 'digital',
+    amount: num(g, ['amount', 'gift_card.amount']),
+    balance: num(g, ['balance', 'remaining_amount', 'amount']),
+    status: String(pick(g, ['status'], 'active')).toLowerCase(),
+    sender_name: text(pick(g, ['sender_name'], '')),
+    recipient_name: text(pick(g, ['recipient_name'], '')),
+    message: pick(g, ['message'], ''),
+    created_at: String(pick(g, ['created_at'], '')),
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------------- notifications
@@ -215,16 +226,12 @@ export async function listNotifications() {
   return rowsOf(await api.get('/general/notifications', undefined, NOTIF_HEADERS)).map(toNotification);
 }
 
-export async function markNotificationRead(id) {
-  await api.post(`/general/notifications/${id}`, form({ _method: 'put' }), NOTIF_HEADERS);
-  return { success: true };
-}
-
+/** The collection only has "read all" (`PUT /general/notifications`): reading one marks them all. */
 export async function markAllNotificationsRead() {
-  const unread = (await listNotifications()).filter((n) => !n.is_read);
-  await Promise.all(unread.map((n) => markNotificationRead(n.id)));
+  await api.post('/general/notifications', form({ _method: 'put' }), NOTIF_HEADERS);
   return { success: true };
 }
+export const markNotificationRead = () => markAllNotificationsRead();
 
 // ------------------------------------------------------------------------------------------------------ preferences
 // No endpoint: kept in this browser, as in the mock.

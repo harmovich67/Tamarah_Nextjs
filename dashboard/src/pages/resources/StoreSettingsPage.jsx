@@ -1,0 +1,64 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Button, Card, ErrorState, PageHeader, PageLoading, SectionHeading, SwitchRow, TextField } from '@/components/ui';
+import { useT } from '@/hooks/useT';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { resourceService } from '@/services';
+import { backendSettings } from '@/services/adapters/laravel/resources';
+
+/**
+ * Store settings of the Tamrna backend (`GET / POST /admin/settings`): contact details and switches such as
+ * `accept_gift_card_amount` (shows / hides the "Other value" button of the storefront gift card page).
+ */
+const isSwitch = (s) => ['boolean', 'bool', 'switch', 'toggle', 'checkbox'].includes(String(s.type).toLowerCase()) || s.key.startsWith('accept_') || s.key.startsWith('enable_');
+const on = (v) => ['1', 'true', 'yes', 'on'].includes(String(v).trim().toLowerCase());
+
+export default function StoreSettingsPage() {
+  const { tr } = useT();
+  const { data = [], isLoading, error, refetch } = useQuery({ queryKey: ['resource', 'settings'], queryFn: () => backendSettings.list(), enabled: !!resourceService });
+  const [values, setValues] = useState({});
+
+  useEffect(() => {
+    setValues(Object.fromEntries(data.map((s) => [s.key, s.value])));
+  }, [data]);
+
+  const changed = useMemo(() => data.filter((s) => String(values[s.key] ?? '') !== String(s.value ?? '')), [data, values]);
+  const groups = useMemo(() => {
+    const map = new Map();
+    data.forEach((s) => map.set(s.group, [...(map.get(s.group) || []), s]));
+    return [...map.entries()];
+  }, [data]);
+
+  const save = useAdminMutation(() => backendSettings.save(changed.map((s) => ({ key: s.key, value: values[s.key] ?? '' }))), {
+    invalidate: [['resource', 'settings']],
+    success: tr('تم حفظ الإعدادات', 'Settings saved'),
+  });
+
+  if (isLoading) return <PageLoading />;
+  if (error) return <ErrorState title={tr('تعذر تحميل الإعدادات', 'Could not load the settings')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />;
+
+  return (
+    <div className="w-full space-y-6 pb-12">
+      <PageHeader
+        title={tr('إعدادات المتجر', 'Store settings')}
+        subtitle={tr('بيانات التواصل ومفاتيح التحكم في المتجر الإلكتروني', 'Contact details and switches for the online store')}
+        actions={<Button icon="check" loading={save.isPending} disabled={!changed.length} onClick={() => save.mutate()}>{tr('حفظ التغييرات', 'Save changes')}{changed.length ? ` (${changed.length})` : ''}</Button>}
+      />
+      {!groups.length ? <p className="text-sm text-slate-500">{tr('لا توجد إعدادات.', 'No settings yet.')}</p> : null}
+      {groups.map(([group, rows]) => (
+        <Card key={group} className="p-5 sm:p-6 space-y-4">
+          <SectionHeading icon="settings">{group}</SectionHeading>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {rows.map((s) =>
+              isSwitch(s) ? (
+                <SwitchRow key={s.key} label={s.label} hint={s.key} checked={on(values[s.key])} onChange={(v) => setValues((o) => ({ ...o, [s.key]: v ? '1' : '0' }))} />
+              ) : (
+                <TextField key={s.key} label={s.label} hint={s.key} dir={s.type === 'phone' || s.type === 'email' ? 'ltr' : undefined} value={values[s.key] ?? ''} onChange={(e) => setValues((o) => ({ ...o, [s.key]: e.target.value }))} />
+              ),
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}

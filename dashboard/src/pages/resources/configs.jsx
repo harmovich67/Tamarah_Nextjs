@@ -187,6 +187,26 @@ export const RESOURCE_PAGES = {
     rowActions: [{ name: 'hide', label: ['إخفاء / إظهار', 'Hide / show'], icon: 'eye-off' }],
   },
 
+  notifications: {
+    service: 'notifications',
+    icon: 'bell',
+    title: ['إرسال الإشعارات', 'Send notifications'],
+    subtitle: ['إشعارات تُرسل إلى عملاء المتجر (عنوان ونص بالعربية والإنجليزية)', 'Notifications sent to store customers (title and text in Arabic and English)'],
+    searchText: (r) => `${r.title_ar} ${r.title_en} ${r.body_ar}`,
+    noEdit: true,
+    fields: [
+      { name: 'title', label: ['عنوان الإشعار', 'Notification title'], type: 'bilingual', required: true },
+      { name: 'body', label: ['نص الإشعار', 'Notification text'], type: 'bilingual-area', required: true },
+      { name: 'type', label: ['المستلمون', 'Recipients'], type: 'select', options: [['client', 'العملاء|Clients']], required: true },
+    ],
+    columns: [
+      { key: 'title', header: ['العنوان', 'Title'], sortValue: (r) => r.title_ar, cell: (r, { locale }) => <b>{loc(r, 'title', locale)}</b> },
+      { key: 'body', header: ['النص', 'Text'], hideOnMobile: true, cell: (r, { locale }) => <span className="text-slate-600 text-xs">{clip(loc(r, 'body', locale), 120)}</span> },
+      { key: 'type', header: ['المستلمون', 'Recipients'], cell: (r) => <Badge tone="gold">{r.type}</Badge> },
+      { key: 'date', header: ['التاريخ', 'Date'], hideOnMobile: true, sortValue: (r) => r.created_at, cell: (r) => <span className="text-xs text-slate-500">{r.created_at}</span> },
+    ],
+  },
+
   contacts: {
     service: 'contacts',
     icon: 'mail',

@@ -111,6 +111,22 @@ export function makeResource(cfg) {
 /** Single-language lists (the screens that only show numbers / names the backend already localizes). */
 const fetchPlain = (path, params) => fetchAll(path, params);
 
+/**
+ * Backend settings (`GET /admin/settings` -> [{ key, value, group, type, label }], `POST /admin/settings` with
+ * `settings[i][key]` / `settings[i][value]`). Includes switches such as `accept_gift_card_amount`.
+ */
+export const backendSettings = {
+  async list() {
+    const rows = await fetchAll(e.adminSettings);
+    return rows
+      .filter((r) => r && r.key)
+      .map((r) => ({ id: r.id, key: r.key, value: r.value ?? '', group: r.group || 'general', type: r.type || 'string', label: r.label || r.key, sort_order: r.sort_order ?? 0 }))
+      .sort((a, b) => a.group.localeCompare(b.group) || a.sort_order - b.sort_order);
+  },
+  /** @param {{ key: string, value: string }[]} changes */
+  save: async (changes) => unwrap(await api.post(e.adminSettings, toFormData({ settings: changes }))),
+};
+
 // ------------------------------------------------------------------------------------------------ definitions
 const R = (path) => ({ list: path.list, item: path.item });
 
@@ -212,6 +228,26 @@ export const resources = {
       client_name: raw.client?.full_name || raw.client?.name || [raw.client?.first_name, raw.client?.last_name].filter(Boolean).join(' ') || raw.user?.name || '',
       order_number: raw.order?.order_number ?? raw.order_id ?? '',
       is_hidden: isOn(raw.is_hidden ?? raw.hidden ?? raw.hide),
+    }),
+  }),
+  notifications: makeResource({
+    path: R(e.adminNotifications),
+    model: 'Notification',
+    fields: [
+      { name: 'title', kind: 'bilingual' },
+      { name: 'body', kind: 'bilingual' },
+      { name: 'type' },
+    ],
+    // `POST /admin/notifications/sender`: content[ar|en][title|body] + type (the collection sends nothing else; no `ids` = everyone).
+    toBody: (body, values) => ({ content: { ar: body.ar, en: body.en }, type: values.type || 'client' }),
+    toRow: (row, raw) => ({
+      ...row,
+      title_ar: row.title_ar || raw.content?.ar?.title || '',
+      title_en: row.title_en || raw.content?.en?.title || '',
+      body_ar: row.body_ar || raw.content?.ar?.body || '',
+      body_en: row.body_en || raw.content?.en?.body || '',
+      type: raw.type ?? 'client',
+      created_at: String(raw.created_at ?? '').slice(0, 16),
     }),
   }),
   contacts: makeResource({

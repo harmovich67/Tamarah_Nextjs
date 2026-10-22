@@ -19,7 +19,7 @@ const CARD_FACE = 'assets/images/gift/gift-card-face.webp';
  * Gift card builder (resources/views/storefront/gift_cards.php). The configured card becomes a cart line via
  * cartService.addGiftCard(); the code is issued at checkout and activated once the order is paid.
  */
-export default function GiftCardBuilder() {
+export default function GiftCardBuilder({ amounts = GIFT_CARD.PRESET_AMOUNTS, acceptCustomAmount = true }) {
   const { locale, isRtl, isEn, tr, currency, money } = useLocale();
   const { user } = useAuth();
   const { addGiftCard } = useCartActions();
@@ -29,7 +29,7 @@ export default function GiftCardBuilder() {
 
   const form = useForm({
     resolver: zodResolver(giftCardSchema(locale)),
-    defaultValues: { card_type: 'digital', amount: GIFT_CARD.PRESET_AMOUNTS[0], sender_name: '', sender_phone: '', recipient_name: '', recipient_phone: '', recipient_email: '', message: '' },
+    defaultValues: { card_type: 'digital', amount: amounts[0], sender_name: '', sender_phone: '', recipient_name: '', recipient_phone: '', recipient_email: '', message: '' },
   });
   const { register, handleSubmit, setValue, getValues, control, formState: { errors } } = form;
   const [cardType, amount, sender, recipient, message] = useWatch({ control, name: ['card_type', 'amount', 'sender_name', 'recipient_name', 'message'] });
@@ -128,12 +128,13 @@ export default function GiftCardBuilder() {
                   </div>
                 </header>
                 <div className="gift-builder-values">
-                  {GIFT_CARD.PRESET_AMOUNTS.map((amt) => (
+                  {amounts.map((amt) => (
                     <button type="button" key={amt} className={!customSelected && Number(amount) === amt ? 'is-selected' : ''} data-amount={amt} onClick={() => pickPreset(amt)}>
                       <b>{amt}</b>
                       <span>{currency}</span>
                     </button>
                   ))}
+                  {acceptCustomAmount ? (
                   <label id="gb-custom-label" className={customSelected ? 'is-selected' : ''} tabIndex={0} onClick={() => setCustomSelected(true)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setCustomSelected(true))}>
                     <span>{tr('قيمة أخرى', 'Other value')}</span>
                     <Icon name="pencil" size={16} />
@@ -151,6 +152,7 @@ export default function GiftCardBuilder() {
                       }}
                     />
                   </label>
+                  ) : null}
                 </div>
               </section>
 

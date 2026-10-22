@@ -76,6 +76,8 @@ export default Object.freeze({
   cities: crud('/admin/cities'),
   cityStatus: (id) => `/admin/cities/${id}/status`,
   cityPrivateDelivery: (id) => `/admin/cities/${id}/update-private-delivery`,
+  adminNotifications: crud('/admin/notifications/sender'), // broadcast to clients: content[ar|en][title|body], type=client
+  adminSettings: '/admin/settings', //     GET list, POST settings[i][key|value]
   productDiscountToggle: (id, variantId) => `/admin/products/${id}/variants/${variantId}/toggle-discount`,
   productSortOrder: '/admin/products/sort-order',
 
