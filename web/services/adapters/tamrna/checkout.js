@@ -3,7 +3,6 @@ import { getClientLocale } from '@/lib/locale-client';
 import { getStoredUser } from '@/lib/session';
 import { createAddress, findSavedAddress, getOrder as getAccountOrder, loadCities, savedAddresses, zonesOf } from './account';
 import { api, form, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder, unsupported, unwrap } from './http';
-
 /**
  * Checkout against the Tamrna backend: `POST /client/orders/checkout { address_id, gift_card_code, delivery_type }`
  * with `delivery_type` = `delivery` (home) | `branch` (pickup) | `private`. The backend takes the cart of the signed-in
@@ -15,12 +14,21 @@ import { api, form, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder,
  */
 const loadCart = async () => (await import('./index')).getCart();
 
+/** Pickup branches of the dashboard (`GET /general/branches`, only those with pickup enabled). */
+async function pickupBranches() {
+  const rows = rowsOf(await api.get('/general/branches'));
+  return rows
+    .filter((b) => b.pickup_enabled !== false && b.pickup_enabled !== 0)
+    .map((b) => ({ id: String(b.id), name: b.name || '', city: String(b.city?.name ?? '').trim(), address: b.address || '' }));
+}
+
 export async function getCheckoutData() {
   const user = getStoredUser();
-  const [cities, savedAddressList] = await Promise.all([loadCities(), user ? savedAddresses().catch(() => []) : []]);
+  const [cities, savedAddressList, branches] = await Promise.all([loadCities(), user ? savedAddresses().catch(() => []) : [], pickupBranches().catch(() => [])]);
   return {
     cities: zonesOf(cities),
     savedAddresses: savedAddressList,
+    branches,
     payment: {
       enable_mada: false,
       enable_apple_pay: false,
@@ -70,26 +78,75 @@ export async function placeOrder(input) {
 
   const branch = input.shipping_type === 'branch_pickup';
   const body = { delivery_type: branch ? 'branch' : 'delivery', gift_card_code: '' };
+  const savedRows = await savedAddresses().catch(() => []);
+  let addressId;
+  let isDefault = false;
 
-  if (!branch) {
+  if (branch) {
+    // Pickup orders need the branch id and (checked on the live server) an address too: the customer's default one.
+    if (!/^\d+$/.test(String(input.pickup_branch || ''))) throw unsupported(t('اختر فرع الاستلام.', 'Choose the pickup branch.'));
+    body.branch_id = input.pickup_branch;
+    const home = savedRows.find((a) => a.is_default) || savedRows[0];
+    if (!home) throw unsupported(t('أضف عنواناً في حسابك أولاً، فهو مطلوب حتى عند الاستلام من الفرع.', 'Add an address to your account first; it is required for branch pickup too.'));
+    addressId = home.id;
+    isDefault = !!home.is_default;
+  } else {
     const street = String(input.address || '').trim();
     const district = String(input.district || '').trim();
     const cities = await loadCities();
     const city = cities.find((c) => c.name === String(input.city || '').trim()) ?? cities[0];
     // The backend orders against an address id: use the saved address the customer picked (or one with the same street and
     // city) and only save a new one when there is none, so retrying never adds duplicates.
-    const savedRows = await savedAddresses().catch(() => []);
     const picked = input.address_id ? savedRows.find((a) => String(a.id) === String(input.address_id) && a.street_address === street) : null;
     const saved = picked || findSavedAddress(savedRows, { street, city });
-    body.address_id = saved ? saved.id : await createAddress({ cityId: city?.id, street, district });
-    if (!body.address_id) throw unsupported(t('تعذر حفظ عنوان التوصيل. حاول مرة أخرى.', 'Could not save the delivery address. Please try again.'));
+    addressId = saved ? saved.id : await createAddress({ cityId: city?.id, street, district, is_default: true });
+    isDefault = saved ? !!saved.is_default : true;
+    if (!addressId) throw unsupported(t('تعذر حفظ عنوان التوصيل. حاول مرة أخرى.', 'Could not save the delivery address. Please try again.'));
   }
+  // The backend only accepts the customer's DEFAULT address (any other one answers 422 "العنوان غير موجود أو غير مفعّل";
+  // checked on the live server), so the address used for the order becomes the default one.
+  if (!isDefault) await api.post(`/client/addresses/${addressId}/set-default`);
+  body.address_id = addressId;
 
-  const res = unwrap(await api.post('/client/orders/checkout', form(body)));
+  let res;
+  try {
+    res = unwrap(await api.post('/client/orders/checkout', form(body)));
+  } catch (error) {
+    await dropUnavailable(error);
+    throw error;
+  }
   const raw = res?.order ?? res;
   const { order, items } = toOrder(raw && typeof raw === 'object' ? raw : {});
   const number = order.order_number || String(raw?.id ?? '');
+  rememberPlacedOrder(order, items);
   return { order: { ...order, items }, next: { type: 'order', url: `/order/${encodeURIComponent(number)}` } };
+}
+
+/**
+ * The cart can hold lines of products deleted since (the cart answer hides them, the checkout refuses with 422
+ * `unavailable_items`): take those lines out so the next try goes through, and say so.
+ */
+async function dropUnavailable(error) {
+  const stale = error?.data?.data?.unavailable_items;
+  if (!Array.isArray(stale) || !stale.length) return;
+  await Promise.all(stale.map((i) => api.delete(`/client/cart/items/${i.item_id}`).catch(() => null)));
+  error.message = t(
+    'تمت إزالة منتجات لم تعد متوفرة من سلتك. راجع السلة ثم أكمل الطلب مرة أخرى.',
+    'Products that are no longer available were removed from your cart. Check your cart and place the order again.',
+  );
+  error.data = { ...error.data, success: false };
+}
+
+/**
+ * The customer order list carries no lines (checked on the live server), but the checkout answer does: keep them for the
+ * confirmation page of this order.
+ */
+function rememberPlacedOrder(order, items) {
+  try {
+    sessionStorage.setItem('tamrna:placed-order', JSON.stringify({ number: order.order_number, id: order.id, order, items }));
+  } catch {
+    /* private mode: the confirmation page shows the totals without the lines */
+  }
 }
 
 export async function getOrder(orderNumber) {

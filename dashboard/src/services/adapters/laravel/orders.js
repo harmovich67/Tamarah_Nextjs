@@ -20,24 +20,32 @@ const pick = (obj, keys, fallback = undefined) => {
 const num = (obj, keys) => Number(pick(obj, keys, 0)) || 0;
 const text = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? v.name ?? v.title ?? '' : v == null ? '' : String(v));
 
-/** Backend status -> the five shipping statuses the screens know. */
+/**
+ * Backend status -> the five shipping statuses the screens know. Seen on the live server: pending -> processing (process)
+ * -> ready (branch pickup only) / deleveried (sic, deliver) -> completed (complete); cancelled (cancel).
+ */
 const STATUS_IN = {
   pending: 'pending',
   new: 'pending',
-  processing: 'pending', //  "process": the team is preparing the order
-  preparing: 'pending',
-  ready: 'processing', //    "ready": packed and ready to ship
+  processing: 'processing',
+  preparing: 'processing',
+  ready: 'shipped', //       branch pickup: ready to collect
   delivering: 'shipped',
   shipped: 'shipped',
   out_for_delivery: 'shipped',
-  delivered: 'shipped', //   "deliver": handed to the courier
+  deleveried: 'shipped', //  "deliver" (the backend spells it this way)
+  delivered: 'shipped',
   completed: 'delivered',
   complete: 'delivered',
   canceled: 'cancelled',
   cancelled: 'cancelled',
 };
-/** Screen status -> backend action (POST /admin/orders/{id}/<action>). */
-const ACTION_FOR = { pending: 'process', processing: 'ready', shipped: 'deliver', delivered: 'complete', cancelled: 'cancel' };
+/**
+ * Screen status -> backend action (POST /admin/orders/{id}/<action>). "ready" is refused for delivery orders (400 "available
+ * for branch pickup orders only"), "deliver" is the step for them.
+ */
+const actionFor = (status, order) =>
+  ({ processing: 'process', shipped: order.shipping_type === 'branch_pickup' ? 'ready' : 'deliver', delivered: 'complete', cancelled: 'cancel' })[status];
 
 const shippingStatusOf = (o) => STATUS_IN[String(pick(o, ['status', 'order_status'], 'pending')).toLowerCase()] ?? 'pending';
 
@@ -45,7 +53,8 @@ function customerOf(o) {
   const c = pick(o, ['client', 'user', 'customer'], {});
   const name = pick(c, ['full_name', 'name']) || [c.first_name, c.last_name].filter(Boolean).join(' ');
   return {
-    name: name || pick(o, ['customer_name', 'client_name', 'name'], ''),
+    // `user.name` is null on the live server: fall back to the e-mail / phone so the row is never blank.
+    name: name || pick(o, ['customer_name', 'client_name'], '') || c.email || c.phone || '',
     phone: String(pick(c, ['phone', 'mobile']) ?? pick(o, ['customer_phone', 'phone'], '')),
     email: pick(c, ['email']) ?? pick(o, ['customer_email'], ''),
   };
@@ -98,9 +107,9 @@ function toOrder(o) {
     payment_method: String(pick(o, ['payment_method', 'payment.method', 'payment_type'], 'cod')),
     payment_status: String(pick(o, ['payment_status'], 'pending')).toLowerCase(),
     shipping_status: shippingStatusOf(o),
-    subtotal: num(o, ['subtotal', 'sub_total', 'items_total']),
+    subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
     shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
-    discount: num(o, ['discount', 'discount_amount', 'coupon_discount']),
+    discount: num(o, ['discount_amount', 'discount', 'coupon_discount']),
     total: num(o, ['total', 'grand_total', 'total_price', 'amount']),
     notes: pick(o, ['notes', 'note'], ''),
     tracking_number: pick(o, ['tracking_number'], ''),
@@ -129,10 +138,18 @@ export async function getOrder(id) {
  * from here (the collection has no endpoint), so only `shipping_status` is sent.
  */
 export async function updateOrderStatus({ id, shipping_status }) {
-  const action = ACTION_FOR[shipping_status];
-  if (!action) return getOrder(id).then(({ order }) => ({ order }));
   const current = await getOrder(id);
-  if (current.order.shipping_status !== shipping_status) await api.post(e.orderAction(id, action));
+  const action = actionFor(shipping_status, current.order);
+  if (action && current.order.shipping_status !== shipping_status) {
+    try {
+      await api.post(e.orderAction(id, action));
+    } catch (error) {
+      // The backend changes the status and then fails (500, missing `order_client_details` table; checked on the live
+      // server): keep going when the order did move.
+      const after = await getOrder(id);
+      if (after.order.shipping_status !== shipping_status) throw error;
+    }
+  }
   return getOrder(id).then(({ order }) => ({ order }));
 }
 

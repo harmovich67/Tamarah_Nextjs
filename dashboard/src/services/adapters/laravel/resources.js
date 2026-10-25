@@ -255,11 +255,13 @@ export const resources = {
     actions: { hide: e.reviewHide },
     bilingualList: false,
     fields: [{ name: 'comment' }, { name: 'rate' }],
+    // Live answer: { user: { name (often null), email, phone }, order: { order_number }, rate, comment, is_hide }.
     toRow: (row, raw) => ({
       ...row,
-      client_name: raw.client?.full_name || raw.client?.name || [raw.client?.first_name, raw.client?.last_name].filter(Boolean).join(' ') || raw.user?.name || '',
+      client_name:
+        raw.client?.full_name || raw.client?.name || [raw.client?.first_name, raw.client?.last_name].filter(Boolean).join(' ') || raw.user?.name || raw.user?.email || raw.user?.phone || '',
       order_number: raw.order?.order_number ?? raw.order_id ?? '',
-      is_hidden: isOn(raw.is_hidden ?? raw.hidden ?? raw.hide),
+      is_hidden: isOn(raw.is_hide ?? raw.is_hidden ?? raw.hidden ?? raw.hide),
     }),
   }),
   notifications: makeResource({

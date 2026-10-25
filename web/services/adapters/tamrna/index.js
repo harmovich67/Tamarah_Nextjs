@@ -328,7 +328,7 @@ async function homeFeed() {
     const reviewRows = Array.isArray(ar?.reviews?.data) ? ar.reviews.data : Array.isArray(ar?.reviews) ? ar.reviews : [];
     const enReviews = new Map((Array.isArray(en?.reviews?.data) ? en.reviews.data : []).map((r) => [r.id, r]));
     const reviewCards = reviewRows
-      .filter((r) => r.is_hidden !== true && r.is_hidden !== 1)
+      .filter((r) => ![true, 1].includes(r.is_hide ?? r.is_hidden))
       .map((r) => {
         const who = r.client ?? r.user ?? {};
         const name = r.client_name || who.full_name || who.name || [who.first_name, who.last_name].filter(Boolean).join(' ') || r.name || '';

@@ -79,6 +79,12 @@ function CheckoutForm() {
     if (checkout && !methods.length && checkout.payment.enable_bank_transfer && !getValues('payment_method')) setValue('payment_method', 'bank_transfer');
   }, [methods, checkout, getValues, setValue]);
 
+  // Backend pickup branches: preselect the first one (the default value is a demo branch key).
+  useEffect(() => {
+    const first = checkout?.branches?.[0]?.id;
+    if (first && !checkout.branches.some((b) => b.id === getValues('pickup_branch'))) setValue('pickup_branch', first);
+  }, [checkout, getValues, setValue]);
+
   // Live shipping quote (replaces the PHP recalculateShipping() fetch).
   const { data: quote } = useQuery({
     queryKey: ['checkout-shipping', shippingType, city, cart?.subtotal, cart?.discount],
@@ -172,7 +178,11 @@ function CheckoutForm() {
                   <input type="radio" value="branch_pickup" {...register('shipping_type')} />
                   <span>
                     <strong>{tr('استلام من الفرع (مجاناً)', 'Boutique Pickup (Free)')}</strong>
-                    <small>{tr('فروع الرياض، جدة، المدينة المنورة', 'Riyadh, Jeddah & Madinah lounges')}</small>
+                    <small>
+                      {checkout.branches?.length
+                        ? [...new Set(checkout.branches.map((b) => b.city).filter(Boolean))].join('، ')
+                        : tr('فروع الرياض، جدة، المدينة المنورة', 'Riyadh, Jeddah & Madinah lounges')}
+                    </small>
                   </span>
                 </label>
               </fieldset>
@@ -230,11 +240,14 @@ function CheckoutForm() {
 
               <fieldset id="branchPickupFields" className={`radio-group${shippingType === 'branch_pickup' ? '' : ' hidden'}`}>
                 <legend>{tr('اختر الفرع الأقرب للاستلام', 'Select nearest boutique for pickup')}</legend>
-                {[
-                  ['riyadh', tr('فرع الرياض', 'Riyadh Boutique'), tr('طريق الملك فهد (مقابل البرج)', 'King Fahd Road')],
-                  ['jeddah', tr('فرع جدة', 'Jeddah Boutique'), tr('طريق الكورنيش الشمالي', 'North Corniche Road')],
-                  ['madinah', tr('فرع المدينة', 'Madinah Boutique'), tr('طريق سلطانة التجاري', 'Sultana Commercial Road')],
-                ].map(([val, name, hint]) => (
+                {(checkout.branches?.length
+                  ? checkout.branches.map((b) => [b.id, b.name, [b.city, b.address].filter(Boolean).join(' — ')])
+                  : [
+                      ['riyadh', tr('فرع الرياض', 'Riyadh Boutique'), tr('طريق الملك فهد (مقابل البرج)', 'King Fahd Road')],
+                      ['jeddah', tr('فرع جدة', 'Jeddah Boutique'), tr('طريق الكورنيش الشمالي', 'North Corniche Road')],
+                      ['madinah', tr('فرع المدينة', 'Madinah Boutique'), tr('طريق سلطانة التجاري', 'Sultana Commercial Road')],
+                    ]
+                ).map(([val, name, hint]) => (
                   <label className="choice" key={val}>
                     <input type="radio" value={val} {...register('pickup_branch')} />
                     <span><strong>{name}</strong><small>{hint}</small></span>

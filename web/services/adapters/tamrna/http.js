@@ -85,16 +85,21 @@ export const requireUser = () => {
   if (!getStoredUser()) throw needsLogin();
 };
 
-/** Backend order status -> the five shipping statuses of the storefront screens. */
+/**
+ * Backend order status -> the five shipping statuses of the storefront screens. Seen on the live server: pending ->
+ * processing (process) -> ready (branch pickup only) / deleveried (sic, "deliver") -> completed; cancelled.
+ */
+export const ORDER_STATUSES = ['pending', 'processing', 'ready', 'deleveried', 'delivered', 'completed', 'cancelled'];
 const STATUS_IN = {
   pending: 'pending',
   new: 'pending',
   processing: 'processing',
   preparing: 'processing',
-  ready: 'processing',
+  ready: 'shipped',
   delivering: 'shipped',
   shipped: 'shipped',
   out_for_delivery: 'shipped',
+  deleveried: 'shipped',
   delivered: 'shipped',
   completed: 'delivered',
   complete: 'delivered',
@@ -125,7 +130,7 @@ export function toOrderItem(i, idx) {
     unit_price: unit,
     price: unit,
     quantity: qty,
-    subtotal: num(i, ['total', 'subtotal']) || unit * qty,
+    subtotal: num(i, ['total_amount', 'total', 'subtotal']) || unit * qty,
     featured_image: img,
     product_image: img,
     slug: product.id ? String(product.id) : undefined,
@@ -150,7 +155,7 @@ export function toOrder(o) {
     governorate: city,
     district: typeof addr === 'object' ? addr.district || '' : '',
     shipping_type: delivery === 'branch' ? 'branch_pickup' : 'home_delivery',
-    subtotal: num(o, ['subtotal', 'sub_total', 'items_total']),
+    subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
     shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount', 'discount_amount', 'gift_card_discount']),
     total: num(o, ['total', 'grand_total', 'total_price', 'amount']),

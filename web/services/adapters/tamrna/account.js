@@ -1,6 +1,6 @@
 import { safeStorage } from '@tamrna/shared/api';
 import { getStoredUser } from '@/lib/session';
-import { api, form, localPhone, notFound, num, PHONE_CODE, pick, requireUser, rowsOf, t, text, toOrder, toUser, unsupported, unwrap } from './http';
+import { api, form, localPhone, notFound, num, ORDER_STATUSES, PHONE_CODE, pick, requireUser, rowsOf, t, text, toOrder, toUser, unsupported, unwrap } from './http';
 
 /**
  * Customer account against the Tamrna backend: profile (`/client/profile`), addresses (`/client/addresses`), orders
@@ -158,18 +158,38 @@ export async function setDefaultAddress(id) {
 }
 
 // -------------------------------------------------------------------------------------------------------- orders
-/** All of the customer's orders (the list endpoint filters by `?status=`; without it every status comes back). */
-async function orderRows() {
+/** One status of `GET /client/orders?status=` (paginated). */
+async function ordersWithStatus(status) {
   const rows = [];
   for (let page = 1; page <= 20; page += 1) {
-    const res = await api.get('/client/orders', { page, per_page: 100 });
+    const res = await api.get('/client/orders', { status, page });
     const got = rowsOf(res);
     rows.push(...got);
     if (!got.length || page >= (res?.meta?.last_page ?? res?.data?.meta?.last_page ?? 1)) break;
   }
-  return rows.map(toOrder).sort((a, b) => b.order.id - a.order.id);
+  return rows;
+}
+
+/**
+ * All of the customer's orders. Checked on the live server: without `?status=` the list comes back EMPTY, so every status is
+ * asked for and merged. The rows carry totals and status only (no lines, no date).
+ */
+async function orderRows() {
+  const byId = new Map();
+  (await Promise.all(ORDER_STATUSES.map((s) => ordersWithStatus(s).catch(() => [])))).flat().forEach((o) => byId.set(o.id, o));
+  return [...byId.values()].map(toOrder).sort((a, b) => b.order.id - a.order.id);
 }
 export { orderRows as customerOrders };
+
+/** The lines of the order just placed (the checkout answer has them, the list does not). */
+function placedOrderLines(order) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('tamrna:placed-order') || 'null');
+    return saved && (saved.number === order.order_number || String(saved.id) === String(order.id)) ? saved : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function listOrders() {
   requireUser();
@@ -181,8 +201,11 @@ export async function getOrder(orderNumber) {
   requireUser();
   const found = (await orderRows()).find((o) => o.order.order_number === String(orderNumber) || String(o.order.id) === String(orderNumber));
   if (!found) throw notFound(t('الطلب غير موجود', 'Order not found'));
+  const placed = !found.items.length ? placedOrderLines(found.order) : null;
+  const items = placed?.items ?? found.items;
+  const order = placed ? { ...placed.order, ...found.order, items_count: items.length, products_snippet: placed.order.products_snippet, shipping_address: placed.order.shipping_address, city: placed.order.city } : found.order;
   // The backend has no customer-side cancel endpoint.
-  return { ...found, settings: { allow_customer_order_cancellation: false } };
+  return { order, items, settings: { allow_customer_order_cancellation: false } };
 }
 
 export async function cancelOrder() {

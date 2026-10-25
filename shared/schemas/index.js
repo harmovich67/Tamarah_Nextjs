@@ -78,7 +78,8 @@ export const checkoutSchema = (locale = 'ar') => {
       city: z.string().trim().optional().default(''),
       district: z.string().trim().optional().default(''),
       address: z.string().trim().optional().default(''),
-      pickup_branch: z.enum(['riyadh', 'jeddah', 'madinah']).optional(),
+      // demo branches (riyadh / jeddah / madinah) or the id of a backend branch
+      pickup_branch: z.string().max(40).optional(),
       notes: z.string().trim().max(500).optional().default(''),
       payment_method: z.string().min(1, msg('اختر طريقة الدفع', 'Select a payment method')),
       save_address: z.boolean().optional().default(false),
