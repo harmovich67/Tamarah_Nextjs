@@ -35,7 +35,13 @@ const cart = partial
 const content = partial
   ? {
       ...mock.content,
-      getHomeData: async () => ({ ...(await mock.content.getHomeData()), ...(await tamrna.realHomeParts()) }),
+      getHomeData: async () => {
+        const { featureCards, reviewCards, ...real } = await tamrna.realHomeParts();
+        const home = { ...(await mock.content.getHomeData()), ...real };
+        // The "features" and "testimonials" sections show what the dashboard holds (Features type home, visible reviews).
+        const fill = (key, setting, rows) => (sec) => (sec.section_key === key && rows.length ? { ...sec, settings: { ...sec.settings, [setting]: rows } } : sec);
+        return { ...home, homeSections: home.homeSections.map(fill('features', 'cards', featureCards)).map(fill('testimonials', 'reviews', reviewCards)) };
+      },
       getSitemapEntries: async () => ({ ...(await mock.content.getSitemapEntries()), ...(await tamrna.realSitemapParts()) }),
       sendContactMessage: tamrna.sendContactMessage,
       getAboutData: tamrna.getAbout,

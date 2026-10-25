@@ -271,10 +271,46 @@ export async function getProductsByIds(ids = []) {
 export async function realHomeParts() {
   const { products, categories } = await loadBase();
   const ordered = products.slice().sort(SORTERS.featured);
-  const parts = { categories, products: ordered.slice(0, 8), preorderProducts: products.filter((p) => p.is_preorder), bestsellers: [] };
+  const feed = await homeFeed();
+  // "Most ordered" is decided by the backend; with none the section is simply not shown.
+  const bestsellers = feed.mostOrderedIds.map((id) => products.find((p) => String(p.id) === String(id))).filter(Boolean).slice(0, 4);
+  const parts = { categories, products: ordered.slice(0, 8), preorderProducts: products.filter((p) => p.is_preorder), bestsellers };
   const banners = await realBanners();
   // Hero slides come from the dashboard banners (placement `home`); with none published the demo slides stay.
-  return banners.length ? { ...parts, banners } : parts;
+  // `featureCards` (dashboard "Features", type home) and `reviewCards` (visible reviews) replace the demo copy of the
+  // home page sections when the backend has any; the page keeps its default copy otherwise.
+  return { ...parts, ...(banners.length ? { banners } : {}), featureCards: feed.featureCards, reviewCards: feed.reviewCards };
+}
+
+/** `GET /client/home` in ar + en: the pieces of the home page that the dashboard controls besides the hero banners. */
+async function homeFeed() {
+  const empty = { mostOrderedIds: [], featureCards: [], reviewCards: [] };
+  try {
+    const [ar, en] = await Promise.all([
+      cached('home:ar', CATALOG_TTL, () => getData('/client/home', undefined, 'ar')),
+      cached('home:en', CATALOG_TTL, () => getData('/client/home', undefined, 'en').catch(() => null)),
+    ]);
+    const enById = new Map((en?.features || []).map((f) => [f.id, f]));
+    const featureCards = (ar?.features || [])
+      .filter((f) => f.is_active !== false)
+      .map((f) => {
+        const other = enById.get(f.id) || f;
+        return { title_ar: f.title || '', title_en: other.title || f.title || '', desc_ar: f.description || '', desc_en: other.description || f.description || '', image: imageOf(f.image) };
+      });
+    const reviewRows = Array.isArray(ar?.reviews?.data) ? ar.reviews.data : Array.isArray(ar?.reviews) ? ar.reviews : [];
+    const enReviews = new Map((Array.isArray(en?.reviews?.data) ? en.reviews.data : []).map((r) => [r.id, r]));
+    const reviewCards = reviewRows
+      .filter((r) => r.is_hidden !== true && r.is_hidden !== 1)
+      .map((r) => {
+        const who = r.client ?? r.user ?? {};
+        const name = r.client_name || who.full_name || who.name || [who.first_name, who.last_name].filter(Boolean).join(' ') || r.name || '';
+        return { id: r.id, name, name_en: enReviews.get(r.id)?.client_name || name, city: '', rating: Number(r.rate ?? r.rating) || 5, comment: r.comment || '', product_name: '' };
+      })
+      .filter((r) => r.comment);
+    return { mostOrderedIds: (ar?.most_ordered || []).map((p) => p.id), featureCards, reviewCards };
+  } catch {
+    return empty;
+  }
 }
 
 const truthy = (v) => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').trim().toLowerCase());

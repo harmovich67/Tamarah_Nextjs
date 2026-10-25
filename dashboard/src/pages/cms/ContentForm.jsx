@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { slugify } from '@tamrna/shared/utils';
-import { Button, ErrorState, FileUploader, Icon, PageLoading, SelectField, Tabs, TextAreaField, TextField, cx } from '@/components/ui';
+import { BTN, Button, ErrorState, FileUploader, Icon, PageLoading, SelectField, Tabs, TextAreaField, TextField, cx } from '@/components/ui';
 import CustomFieldsBox, { withDefaults } from '@/components/cms/CustomFieldsBox';
 import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';

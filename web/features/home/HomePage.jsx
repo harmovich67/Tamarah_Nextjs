@@ -36,7 +36,12 @@ function FeatureStrip({ section, locale }) {
           const icon = FEATURE_ICON_MAP[feat.icon] || feat.icon || 'award';
           return (
             <li key={`${title}-${i}`}>
-              <Icon name={icon} size={40} stroke={1.35} />
+              {feat.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={feat.image} alt="" width={40} height={40} loading="lazy" />
+              ) : (
+                <Icon name={icon} size={40} stroke={1.35} />
+              )}
               <div>
                 <strong>{title}</strong>
                 <p className="clamp-2">{desc}</p>

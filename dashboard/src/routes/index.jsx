@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AdminLayout from '@/layouts/AdminLayout';
+import { BACKEND_REDIRECTS } from '@/layouts/navigation';
 import { RequireAuth, RequirePermission } from './guards';
 import { PageLoading } from '@/components/ui';
 import { config } from '@/lib/config';
@@ -50,6 +51,15 @@ const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities
 
 const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
 
+/** Production (laravel mode): a legacy demo screen whose data lives on a backend screen (see navigation.js `backend`) opens that screen. */
+const withBackendRedirects = (routes) =>
+  config.apiMode !== 'laravel'
+    ? routes
+    : routes.map((r) => {
+        const from = Object.keys(BACKEND_REDIRECTS).find((k) => r.path === k || r.path?.startsWith(`${k}/`));
+        return from ? { path: r.path, element: <Navigate to={BACKEND_REDIRECTS[from]} replace /> } : r;
+      });
+
 const rawBase = import.meta.env.BASE_URL || '/';
 const normalizedBase = rawBase.replace(/\/+$/, '');
 
@@ -61,7 +71,7 @@ export const router = createBrowserRouter(
     children: [
       {
         element: <AdminLayout />,
-        children: [
+        children: withBackendRedirects([
           { index: true, element: guard('dashboard.view', <Dashboard />) },
           { path: 'products', element: guard('products.view', <Products />) },
           { path: 'products/create', element: guard('products.create', <ProductForm />) },
@@ -92,11 +102,10 @@ export const router = createBrowserRouter(
           { path: 'security', element: guard('security.view', <Security />) },
           { path: 'backup', element: guard('backup.view', <Backup />) },
           ...(config.apiMode === 'laravel' ? [{ path: 'store-settings', element: guard('resources.view', <StoreSettings />) }] : []),
-          ...(config.apiMode === 'laravel' ? RESOURCE_ROUTES.map((r) => ({ path: r, element: guard('resources.view', <ResourcePage resource={r} />) })) : []),
-          // Legacy PHP URL (/admin/shipping_zones etc. were hyphenated already; keep a friendly alias)
+          ...(config.apiMode === 'laravel' ? RESOURCE_ROUTES.map((r) => ({ path: r, element: guard('resources.view', <ResourcePage resource={r} />) })) : []),          // Legacy PHP URL (/admin/shipping_zones etc. were hyphenated already; keep a friendly alias)
           { path: 'admin/*', element: <Navigate to="/" replace /> },
           { path: '*', element: <NotFound /> },
-        ],
+        ]),
       },
     ],
   }],

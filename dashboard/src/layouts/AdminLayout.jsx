@@ -11,28 +11,25 @@ import { useUiStore } from '@/store/uiStore';
 import { useLocaleStore } from '@/store/localeStore';
 import { authService, systemService } from '@/services';
 import { config } from '@/lib/config';
-import { NAV } from './navigation';
+import { NAV, visibleItems } from './navigation';
 
-/** Screens the real backend feeds (and therefore the storefront). Everything else still runs on browser-only demo data. */
-const BACKED_PREFIXES = ['/products', '/categories'];
+/**
+ * Screens that still run on browser-only demo data in laravel mode (the backend has no API for them: see NOT_IN_BACKEND in
+ * services/index.js). Every other screen (dashboard, products, categories, orders, users, roles, store data) is on the backend.
+ */
+const LOCAL_ONLY_PREFIXES = ['/warehouses', '/coupons', '/settings', '/menus', '/posts', '/custom-fields', '/translations', '/cache', '/logs', '/security', '/backup'];
 
 /** Warns on screens that do not reach the backend, so nobody expects their changes to appear on the storefront. */
 function DemoDataNotice({ pathname }) {
   const { tr } = useT();
   if (config.apiMode !== 'laravel' || !config.mockFallback) return null;
-  if (BACKED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
-  const home = pathname.startsWith('/home-sections');
+  if (!LOCAL_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
   return (
     <Alert type="warning" className="mb-5">
-      {home
-        ? tr(
-            'الشرائح (البانرات) متصلة بالخادم، أما باقي أقسام الصفحة الرئيسية فبيانات تجريبية محفوظة في هذا المتصفح فقط ولا تؤثر على الموقع حاليًا.',
-            'Slides (banners) are connected to the server; the other homepage sections are demo data kept in this browser only and do not change the storefront yet.',
-          )
-        : tr(
-            'هذه الشاشة تعمل ببيانات تجريبية محفوظة في هذا المتصفح فقط، ولا تؤثر على الموقع (الخادم لا يوفّر لها واجهة API بعد).',
-            'This screen runs on demo data kept in this browser only and does not change the storefront (the server has no API for it yet).',
-          )}
+      {tr(
+        'هذه الشاشة تعمل ببيانات تجريبية محفوظة في هذا المتصفح فقط، ولا تؤثر على الموقع (الخادم لا يوفّر لها واجهة API بعد).',
+        'This screen runs on demo data kept in this browser only and does not change the storefront (the server has no API for it yet).',
+      )}
     </Alert>
   );
 }
@@ -142,9 +139,8 @@ export default function AdminLayout() {
         {/* Nav list */}
         <nav className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-1.5 sidebar-scroll">
           {NAV.map((group, gi) => {
-            // Backend-only screens exist in laravel mode; the storefront gift-card link is a demo-mode shortcut.
-            if (group.backendOnly && config.apiMode !== 'laravel') return null;
-            const items = group.items.filter((i) => (!i.permission || can(i.permission)) && !(i.mockOnly && config.apiMode === 'laravel'));
+            // Production (laravel mode): demo-only screens are hidden and the legacy links open their backend screen.
+            const items = visibleItems(group, { laravel: config.apiMode === 'laravel', can });
             if (!items.length) return null;
             return (
               <div key={gi} className="space-y-1">
@@ -161,8 +157,7 @@ export default function AdminLayout() {
                         <Icon name={item.icon} className="w-4 h-4 text-amber-400/90 shrink-0" />
                         <span>{label}</span>
                       </div>
-                      {item.external ? <Icon name="external-link" className="w-3 h-3 text-slate-500 shrink-0" /> : null}
-                    </>
+                      {item.external ? <Icon name="external-link" className="w-3 h-3 text-slate-500 shrink-0" /> : null}                    </>
                   );
                   return item.external ? (
                     <a

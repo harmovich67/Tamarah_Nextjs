@@ -253,7 +253,9 @@ function Reorder({ onMove, first, last, pending }) {
 /** Homepage sections + hero slider management (resources/views/admin/home_sections.php). */
 export default function HomeSections() {
   const { t, tr, isEn } = useT();
-  const [tab, setTab] = useQueryParam('tab', 'sections');
+  const [tabParam, setTab] = useQueryParam('tab', 'sections');
+  // Production: the backend serves the hero slides only; the other homepage blocks read Features / Reviews / Gift cards.
+  const tab = isLaravel ? 'banners' : tabParam;
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['home'], queryFn: () => homeService.getHomeContent() });
   const [editing, setEditing] = useState({ kind: null, section: null });
   const [customOpen, setCustomOpen] = useState(false);
@@ -293,7 +295,16 @@ export default function HomeSections() {
         )}
       </div>
 
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'sections', label: tr('أقسام الصفحة الرئيسية', 'Homepage sections'), icon: 'boxes', count: sections.length }, { key: 'banners', label: tr('شرائح السلايدر', 'Hero slides'), icon: 'sparkles', count: banners.length }]} />
+      {isLaravel ? (
+        <Alert type="info">
+          {tr(
+            'شرائح السلايدر تظهر في أعلى الصفحة الرئيسية. شريط المميزات من شاشة «المميزات» (النوع home)، وآراء العملاء من «التقييمات»، و«الأكثر طلباً» تلقائي من الطلبات.',
+            'Slides appear at the top of the homepage. The benefits strip comes from the Features screen (type home), customer reviews from Reviews, and "Most ordered" is automatic from orders.',
+          )}
+        </Alert>
+      ) : (
+        <Tabs value={tab} onChange={setTab} tabs={[{ key: 'sections', label: tr('أقسام الصفحة الرئيسية', 'Homepage sections'), icon: 'boxes', count: sections.length }, { key: 'banners', label: tr('شرائح السلايدر', 'Hero slides'), icon: 'sparkles', count: banners.length }]} />
+      )}
 
       {error ? <ErrorState title={tr('تعذر تحميل المحتوى', 'Could not load the content')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} /> : isLoading ? <Skeleton className="h-72 rounded-3xl" /> : tab === 'sections' ? (
         <div className="space-y-4">
