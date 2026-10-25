@@ -23,6 +23,38 @@ function useOptions(field) {
   return from ? data.map((r) => [String(r.id), (locale === 'en' ? r.name_en || r.name_ar : r.name_ar || r.name_en) || `#${r.id}`]) : field.options || [];
 }
 
+/** Checkbox list of the permissions a role can hold, grouped by module (`GET /admin/permission-not-paginated`). */
+function PermissionsField({ label, value = [], onChange, error }) {
+  const { tr } = useT();
+  const { data = [], isLoading, error: loadError } = useQuery({ queryKey: ['resource', 'permissions'], queryFn: () => resourceService.roles.permissionOptions() });
+  const groups = data.reduce((map, p) => map.set(p.group, [...(map.get(p.group) || []), p]), new Map());
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+
+  return (
+    <div className="space-y-2">
+      <p className="font-semibold text-slate-700">{label}</p>
+      {isLoading ? <p className="text-xs text-slate-500">{tr('جارٍ تحميل الصلاحيات…', 'Loading permissions…')}</p> : null}
+      {loadError ? <p className="text-xs text-red-600">{tr('تعذر تحميل الصلاحيات', 'Could not load the permissions')}</p> : null}
+      <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 p-3 space-y-3">
+        {[...groups.entries()].map(([group, items]) => (
+          <fieldset key={group} className="space-y-1">
+            <legend className="text-xs font-bold text-slate-500 uppercase">{group}</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {items.map((p) => (
+                <label key={p.id} className="flex items-center gap-2 text-xs text-slate-700">
+                  <input type="checkbox" checked={value.includes(p.id)} onChange={() => toggle(p.id)} />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
 function FieldInput({ field, control, register, errors }) {
   const { tr } = useT();
   const options = useOptions(field);
@@ -57,6 +89,8 @@ function FieldInput({ field, control, register, errors }) {
       return <Controller control={control} name={field.name} render={({ field: f }) => <FileUploader label={label} value={f.value || null} onChange={f.onChange} error={err(field.name)} />} />;
     case 'images':
       return <Controller control={control} name={field.name} render={({ field: f }) => <FileUploader label={label} multiple value={f.value || []} onChange={f.onChange} error={err(field.name)} />} />;
+    case 'permissions':
+      return <Controller control={control} name={field.name} render={({ field: f }) => <PermissionsField label={label} value={f.value || []} onChange={f.onChange} error={err(field.name)} />} />;
     case 'number':
       return <TextField label={label} type="number" step={field.step || '1'} required={field.required} hint={hint} error={err(field.name)} {...register(field.name, required)} />;
     case 'textarea':
@@ -67,7 +101,7 @@ function FieldInput({ field, control, register, errors }) {
 }
 
 const blankFor = (fields) =>
-  Object.fromEntries(fields.flatMap((f) => (f.type === 'bilingual' || f.type === 'bilingual-area' ? [[`${f.name}_ar`, ''], [`${f.name}_en`, '']] : [[f.name, f.type === 'switch' ? true : f.type === 'images' ? [] : f.type === 'image' ? null : '']])));
+  Object.fromEntries(fields.flatMap((f) => (f.type === 'bilingual' || f.type === 'bilingual-area' ? [[`${f.name}_ar`, ''], [`${f.name}_en`, '']] : [[f.name, f.type === 'switch' ? true : f.type === 'images' || f.type === 'permissions' ? [] : f.type === 'image' ? null : '']])));
 
 function FormDialog({ page, svc, open, row, onClose }) {
   const { tr } = useT();

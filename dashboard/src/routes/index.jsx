@@ -46,7 +46,7 @@ const NotFound = page(() => import('@/pages/NotFound'));
 const StoreSettings = page(() => import('@/pages/resources/StoreSettingsPage'));
 const ResourcePage = page(() => import('@/pages/resources/ResourcePage'));
 // Tamrna backend resources: route path -> key of RESOURCE_PAGES. Only registered in laravel mode.
-const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities', 'features', 'sections', 'system-numbers', 'contacts', 'notifications'];
+const RESOURCE_ROUTES = ['clients', 'reviews', 'gift-cards', 'branches', 'cities', 'features', 'sections', 'system-numbers', 'contacts', 'notifications', 'roles'];
 
 const guard = (permission, element) => <RequirePermission permission={permission}>{element}</RequirePermission>;
 

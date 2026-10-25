@@ -207,6 +207,22 @@ export const RESOURCE_PAGES = {
     ],
   },
 
+  roles: {
+    service: 'roles',
+    icon: 'shield-check',
+    title: ['الأدوار والصلاحيات', 'Roles & permissions'],
+    subtitle: ['أدوار فريق الإدارة والصلاحيات التي يملكها كل دور', 'Admin team roles and the permissions each role holds'],
+    searchText: (r) => `${r.name_ar} ${r.name_en}`,
+    fields: [
+      { name: 'name', label: ['اسم الدور', 'Role name'], type: 'bilingual', required: true },
+      { name: 'permission_ids', label: ['الصلاحيات', 'Permissions'], type: 'permissions' },
+    ],
+    columns: [
+      { key: 'name', header: ['الدور', 'Role'], sortValue: (r) => r.name_ar, cell: (r, { locale }) => <b>{loc(r, 'name', locale)}</b> },
+      { key: 'permissions', header: ['عدد الصلاحيات', 'Permissions'], align: 'center', cell: (r, { tr }) => (r.permissions_known ? <Badge tone="gold">{r.permission_ids.length}</Badge> : <span className="text-slate-300">—</span>) },
+    ],
+  },
+
   contacts: {
     service: 'contacts',
     icon: 'mail',

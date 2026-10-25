@@ -53,6 +53,7 @@ export default Object.freeze({
   adminStatus: (id) => `/admin/admins/${id}/status`,
   roles: crud('/admin/roles'), //           name via en[name] / ar[name], permissions[]
   roleList: '/admin/role-not-paginated', //  every role, unpaginated
+  permissionList: '/admin/permission-not-paginated', // every permission a role can hold
 
   // In the Tamrna backend but without a dashboard screen yet (see README "Not wired").
   clients: crud('/admin/clients'), //       GET ?keyword&is_active

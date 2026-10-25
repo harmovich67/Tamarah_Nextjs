@@ -19,6 +19,7 @@ const BACKEND_NAV = {
     { to: '/notifications', icon: 'bell', label: ['إرسال الإشعارات', 'Send notifications'], permission: 'resources.view' },
     { to: '/store-settings', icon: 'settings', label: ['إعدادات المتجر', 'Store settings'], permission: 'resources.view' },
     { to: '/contacts', icon: 'mail', label: ['رسائل التواصل', 'Contact messages'], permission: 'resources.view' },
+    { to: '/roles', icon: 'shield-check', label: ['الأدوار والصلاحيات', 'Roles & permissions'], permission: 'resources.view' },
   ],
 };
 

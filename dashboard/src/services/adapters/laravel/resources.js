@@ -1,4 +1,4 @@
-import { apiClient as api } from '@/lib/apiClient';
+import { apiClient as api, getAdminLocale } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchAllBilingual, isOn, listFilters, mediaList, mediaOf, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
@@ -31,6 +31,11 @@ function toRow(raw, cfg) {
       row[`${f.name}_ids`] = list.map((m) => m.id);
     } else if (f.kind === 'bool') {
       row[f.name] = raw[f.name] === undefined ? f.default ?? true : isOn(raw[f.name]);
+    } else if (f.kind === 'permissions') {
+      // ids of the permissions a role holds; `permissions_known` is false when the list answer does not carry them
+      const list = raw[f.name];
+      row.permission_ids = Array.isArray(list) ? list.map((p) => String(p !== null && typeof p === 'object' ? p.id : p)) : [];
+      row.permissions_known = Array.isArray(list);
     } else if (f.kind === 'relation') {
       // a related record (e.g. the city of a branch): its id for the form, its name for the table
       const rel = raw[f.name.replace(/_id$/, '')];
@@ -70,6 +75,9 @@ async function toBody(values, cfg) {
       body[f.name] = out;
     } else if (f.kind === 'bool') {
       body[f.name] = v ?? f.default ?? true;
+    } else if (f.kind === 'permissions') {
+      // `permissions[]`; an edit whose permissions were never loaded must not send an empty list (it would clear them)
+      if (values.permissions_known !== false) body[f.name] = values.permission_ids || [];
     } else if (v !== undefined && v !== null && v !== '') {
       body[f.name] = v;
     }
@@ -127,8 +135,25 @@ export const backendSettings = {
   save: async (changes) => unwrap(await api.post(e.adminSettings, toFormData({ settings: changes }))),
 };
 
+/**
+ * Roles hold `permissions[]`; the options for the checkboxes come from `GET /admin/permission-not-paginated`
+ * ({ id, name, group? }, shaped defensively because the collection has no example).
+ */
+function withPermissions(resource) {
+  return {
+    ...resource,
+    permissionOptions: async () => {
+      const locale = getAdminLocale();
+      return (await fetchAll(e.permissionList, {}, locale)).map((p) => {
+        const label = typeof p.name === 'string' ? p.name : tx(p, 'name', locale) || p.title || p.key || `#${p.id}`;
+        return { id: String(p.id), label, group: String(p.group ?? p.module ?? p.guard_name ?? '').trim() || String(p.key ?? p.name ?? '').split(/[.:_-]/)[0] || 'general' };
+      });
+    },
+  };
+}
+
 // ------------------------------------------------------------------------------------------------ definitions
-const R = (path) => ({ list: path.list, item: path.item });
+const R =(path) => ({ list: path.list, item: path.item });
 
 export const resources = {
   giftCards: makeResource({
@@ -250,6 +275,17 @@ export const resources = {
       created_at: String(raw.created_at ?? '').slice(0, 16),
     }),
   }),
+  roles: withPermissions(
+    makeResource({
+      path: R(e.roles),
+      model: 'Role',
+      errorMap: [[/^permissions(\..*)?$/, () => 'permission_ids']],
+      fields: [
+        { name: 'name', kind: 'bilingual' },
+        { name: 'permissions', kind: 'permissions' },
+      ],
+    }),
+  ),
   contacts: makeResource({
     path: R(e.contacts),
     model: 'Contact',
