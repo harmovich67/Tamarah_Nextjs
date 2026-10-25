@@ -17,10 +17,14 @@ export function loadCities() {
     citiesPromise = api
       .get('/general/cities')
       .then((res) => {
-        const seen = new Set();
-        return rowsOf(res)
-          .map((c) => ({ id: c.id, name: String(c.name ?? '').trim() }))
-          .filter((c) => c.name && !seen.has(c.name) && seen.add(c.name));
+        const byName = new Map();
+        rowsOf(res).forEach((c) => {
+          const name = String(c.name ?? '').trim();
+          if (!name) return;
+          if (byName.has(name)) byName.get(name).ids.push(String(c.id));
+          else byName.set(name, { id: c.id, name, ids: [String(c.id)] });
+        });
+        return [...byName.values()];
       })
       .catch((error) => {
         citiesPromise = null;
@@ -82,6 +86,7 @@ function toAddress(a, user) {
     recipient_name: user?.name || '',
     phone: user?.phone || '',
     city: cityOfAddress(a),
+    city_id: a.city_id ?? a.city?.id ?? null,
     governorate: cityOfAddress(a),
     district: a.district ?? '',
     street_address: street,
@@ -103,6 +108,25 @@ export async function listAddresses() {
   requireUser();
   const [addresses, cities] = await Promise.all([addressRows(), loadCities()]);
   return { addresses, cities: cityNames(cities), zones: zonesOf(cities), limits: { allowMultiple: true, max: 10 } };
+}
+
+/**
+ * Creates an address and returns its id. The create response's shape is not documented, so when it carries no id the list is
+ * read back and the newest address with the same street is used (never create a second one).
+ */
+export async function createAddress({ cityId: city_id, street, national_address, district, is_default = false }) {
+  const res = unwrap(await api.post('/client/addresses', form({ city_id, street, national_address: national_address || street, district: district || undefined, is_default })));
+  const direct = res?.id ?? res?.address?.id ?? res?.data?.id;
+  if (direct) return direct;
+  const rows = await addressRows();
+  const match = rows.filter((a) => a.street_address === street).sort((a, b) => b.id - a.id)[0] ?? rows.sort((a, b) => b.id - a.id)[0];
+  return match?.id ?? null;
+}
+
+/** An already saved address with this street in this city (compared by city id or name), so a retry never adds another one. */
+export function findSavedAddress(rows, { street, city }) {
+  const wanted = String(street || '').trim();
+  return rows.find((a) => a.street_address === wanted && (!city || a.city === city.name || city.ids.includes(String(a.city_id)))) || null;
 }
 
 /** @param {object} input id? city street_address building_floor landmark is_default */

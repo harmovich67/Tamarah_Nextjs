@@ -1,7 +1,7 @@
 import { formatMoney2 } from '@tamrna/shared/utils';
 import { getClientLocale } from '@/lib/locale-client';
 import { getStoredUser } from '@/lib/session';
-import { getOrder as getAccountOrder, loadCities, savedAddresses, zonesOf } from './account';
+import { createAddress, findSavedAddress, getOrder as getAccountOrder, loadCities, savedAddresses, zonesOf } from './account';
 import { api, form, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder, unsupported, unwrap } from './http';
 
 /**
@@ -76,18 +76,13 @@ export async function placeOrder(input) {
     const district = String(input.district || '').trim();
     const cities = await loadCities();
     const city = cities.find((c) => c.name === String(input.city || '').trim()) ?? cities[0];
-    // Reuse a saved address with the same street + city; otherwise save this one (the backend orders against an address id).
-    const saved = (await savedAddresses().catch(() => [])).find((a) => a.street_address === street && a.city === city?.name);
-    if (saved) body.address_id = saved.id;
-    else {
-      const res = unwrap(
-        await api.post(
-          '/client/addresses',
-          form({ city_id: city?.id, street, national_address: street, district: district || undefined, is_default: false }),
-        ),
-      );
-      body.address_id = res?.id ?? res?.address?.id;
-    }
+    // The backend orders against an address id: use the saved address the customer picked (or one with the same street and
+    // city) and only save a new one when there is none, so retrying never adds duplicates.
+    const savedRows = await savedAddresses().catch(() => []);
+    const picked = input.address_id ? savedRows.find((a) => String(a.id) === String(input.address_id) && a.street_address === street) : null;
+    const saved = picked || findSavedAddress(savedRows, { street, city });
+    body.address_id = saved ? saved.id : await createAddress({ cityId: city?.id, street, district });
+    if (!body.address_id) throw unsupported(t('تعذر حفظ عنوان التوصيل. حاول مرة أخرى.', 'Could not save the delivery address. Please try again.'));
   }
 
   const res = unwrap(await api.post('/client/orders/checkout', form(body)));

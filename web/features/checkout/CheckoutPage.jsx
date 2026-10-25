@@ -107,7 +107,8 @@ function CheckoutForm() {
 
   const onSubmit = async (values) => {
     try {
-      const result = await checkoutService.placeOrder(values);
+      // `address_id` (a saved address picked above) is not part of the form schema: read it from the form directly.
+      const result = await checkoutService.placeOrder({ ...values, address_id: getValues('address_id') });
       qc.invalidateQueries({ queryKey: cartKey });
       const url = result.next.url;
       if (/^https?:\/\//.test(url)) window.location.assign(url);
@@ -186,6 +187,7 @@ function CheckoutForm() {
                       onChange={(e) => {
                         const a = checkout.savedAddresses.find((x) => String(x.id) === e.target.value);
                         if (!a) return;
+                        setValue('address_id', a.id);
                         setValue('city', a.city || 'الرياض');
                         setValue('district', a.district || '');
                         setValue('address', a.street_address || a.address || '');
