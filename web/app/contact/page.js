@@ -13,9 +13,10 @@ export async function generateMetadata() {
 }
 
 export default async function Page() {
-  const s = await contentService.getSettings();
+  const [s, branches] = await Promise.all([contentService.getSettings(), contentService.getBranches?.().catch(() => null)]);
   return (
     <ContactPage
+      branches={branches ?? undefined}
       phone={s.contact_phone || '8001248888'}
       email={s.contact_email || 'care@tumurna.com'}
       whatsapp={String(s.contact_whatsapp || s.whatsapp_number || '966500000000').replace(/\D+/g, '')}

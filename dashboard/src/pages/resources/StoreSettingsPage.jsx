@@ -10,17 +10,21 @@ import { backendSettings } from '@/services/adapters/laravel/resources';
  * Store settings of the Tamrna backend (`GET / POST /admin/settings`): contact details and switches such as
  * `accept_gift_card_amount` (shows / hides the "Other value" button of the storefront gift card page).
  */
-const isSwitch = (s) => ['boolean', 'bool', 'switch', 'toggle', 'checkbox'].includes(String(s.type).toLowerCase()) || s.key.startsWith('accept_') || s.key.startsWith('enable_');
+// The backend's `type` decides the input: a number setting (e.g. `accept_gift_card_amount`, type float) must not become a 1 / 0 switch.
+const isSwitch = (s) => ['boolean', 'bool', 'switch', 'toggle', 'checkbox'].includes(String(s.type).toLowerCase());
+const isNumber = (s) => ['float', 'double', 'decimal', 'integer', 'int', 'number'].includes(String(s.type).toLowerCase());
 const on = (v) => ['1', 'true', 'yes', 'on'].includes(String(v).trim().toLowerCase());
 
 export default function StoreSettingsPage() {
   const { tr } = useT();
-  const { data = [], isLoading, error, refetch } = useQuery({ queryKey: ['resource', 'settings'], queryFn: () => backendSettings.list(), enabled: !!resourceService });
+  const { data: rows, isLoading, error, refetch } = useQuery({ queryKey: ['resource', 'settings'], queryFn: () => backendSettings.list(), enabled: !!resourceService });
+  // A `data = []` default is a new array on every render while loading / after an error, which re-ran the effect forever.
+  const data = useMemo(() => rows ?? [], [rows]);
   const [values, setValues] = useState({});
 
   useEffect(() => {
-    setValues(Object.fromEntries(data.map((s) => [s.key, s.value])));
-  }, [data]);
+    if (rows) setValues(Object.fromEntries(rows.map((s) => [s.key, s.value])));
+  }, [rows]);
 
   const changed = useMemo(() => data.filter((s) => String(values[s.key] ?? '') !== String(s.value ?? '')), [data, values]);
   const groups = useMemo(() => {
@@ -53,7 +57,16 @@ export default function StoreSettingsPage() {
               isSwitch(s) ? (
                 <SwitchRow key={s.key} label={s.label} hint={s.key} checked={on(values[s.key])} onChange={(v) => setValues((o) => ({ ...o, [s.key]: v ? '1' : '0' }))} />
               ) : (
-                <TextField key={s.key} label={s.label} hint={s.key} dir={s.type === 'phone' || s.type === 'email' ? 'ltr' : undefined} value={values[s.key] ?? ''} onChange={(e) => setValues((o) => ({ ...o, [s.key]: e.target.value }))} />
+                <TextField
+                  key={s.key}
+                  label={s.label}
+                  hint={s.isPublic ? s.key : `${s.key} · ${tr('غير ظاهر للموقع', 'not visible to the storefront')}`}
+                  type={isNumber(s) ? 'number' : 'text'}
+                  step={isNumber(s) ? 'any' : undefined}
+                  dir={s.type === 'phone' || s.type === 'email' || isNumber(s) ? 'ltr' : undefined}
+                  value={values[s.key] ?? ''}
+                  onChange={(e) => setValues((o) => ({ ...o, [s.key]: e.target.value }))}
+                />
               ),
             )}
           </div>

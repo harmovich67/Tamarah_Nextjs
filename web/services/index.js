@@ -45,6 +45,7 @@ const content = partial
       getSitemapEntries: async () => ({ ...(await mock.content.getSitemapEntries()), ...(await tamrna.realSitemapParts()) }),
       sendContactMessage: tamrna.sendContactMessage,
       getAboutData: tamrna.getAbout,
+      getBranches: tamrna.getBranches,
       getGiftCardOptions: tamrna.getGiftCardOptions,
       getSettings: async () => ({ ...(await mock.content.getSettings()), ...(await tamrna.realSettings()) }),
       getShellData: async () => {

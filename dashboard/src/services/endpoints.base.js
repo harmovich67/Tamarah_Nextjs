@@ -14,6 +14,7 @@ export default Object.freeze({
   refresh: '/admin/auth/refresh',
 
   // Uploads return a media id, which is then sent as category.image / product.gallery[].
+  // `remove` is a POST on the live server (the collection says DELETE, which answers 404 "method not supported").
   media: { upload: '/general/attachment', remove: (id) => `/general/attachment/delete/${id}` },
 
   dashboard: '/admin/home', //              GET ?date_filter=all|today|week|month|year|custom[&from_date&to_date]

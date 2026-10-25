@@ -14,10 +14,12 @@ import { contentService } from '@/services';
 import { showToast } from '@/store/toastStore';
 
 /** Contact page + branch locator (resources/views/storefront/contact.php). */
-export default function ContactPage({ phone, email, whatsapp }) {
+export default function ContactPage({ phone, email, whatsapp, branches: source = BRANCHES }) {
   const { locale, isRtl, tr } = useLocale();
-  const branches = BRANCHES[locale].map((b) => ({
+  const branches = (source[locale] || source.ar).map((b) => ({
     ...b,
+    phone: b.phone || phone,
+    hours: b.hours || '—',
     map: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${isRtl ? 'تمرنا، ' : 'Tamrna, '}${b.address}`)}`,
   }));
   const [active, setActive] = useState(0);
@@ -98,7 +100,7 @@ export default function ContactPage({ phone, email, whatsapp }) {
             <div className="branch-locator-body">
               <ul className="branch-list">
                 {branches.map((b, i) => (
-                  <li key={b.city}>
+                  <li key={b.id ?? `${b.city}-${i}`}>
                     <button type="button" className={`branch-item${i === active ? ' branch-item--active' : ''}`} data-branch={i} aria-pressed={i === active} onClick={() => setActive(i)}>
                       <strong>{b.name}</strong>
                       <em>{b.city}</em>

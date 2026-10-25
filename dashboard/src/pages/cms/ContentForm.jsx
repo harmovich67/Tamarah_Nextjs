@@ -12,6 +12,8 @@ import { cmsService } from '@/services';
 import { pageSchema } from '@/schemas';
 import { config } from '@/lib/config';
 
+// Stable default: a fresh `[]` per render would re-run the effect that depends on `groups` on every render.
+const NO_GROUPS = [];
 const card = 'bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-6';
 const h2 = 'text-base font-black text-stone-900 flex items-center gap-2 pb-3 border-b border-stone-100';
 
@@ -43,7 +45,7 @@ export default function ContentForm({ kind }) {
   const titleAr = watch('title_ar');
 
   // Field groups matching this entity (all / id:N / type:X)
-  const { data: groups = [] } = useQuery({
+  const { data: groups = NO_GROUPS } = useQuery({
     queryKey: ['field-groups', kind, id ?? 'new', isPage ? null : postType],
     queryFn: () => cmsService.getFieldGroups({ entityType: kind, entityId: editing ? Number(id) : null, subType: isPage ? null : postType }),
   });

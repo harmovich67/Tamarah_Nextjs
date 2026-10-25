@@ -107,21 +107,30 @@ function FormDialog({ page, svc, open, row, onClose }) {
   const { tr } = useT();
   const editing = !!row;
   const { register, handleSubmit, reset, control, setError, formState: { errors } } = useForm({ defaultValues: blankFor(page.fields) });
+  // List rows can be partial (branches carry no address / coordinates there): read the full record for the form.
+  const { data: detail, isFetching: loadingDetail } = useQuery({
+    queryKey: ['resource', page.service, 'item', row?.id],
+    queryFn: () => svc.get(row.id),
+    enabled: open && !!row && !!svc?.get,
+  });
 
   useEffect(() => {
     if (!open) return;
     if (!row) return reset(blankFor(page.fields));
+    // Values of the full record win; an empty one there keeps what the list row had.
+    const filled = (v) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length);
+    const merged = { ...row, ...Object.fromEntries(Object.entries(detail || {}).filter(([k, v]) => !k.startsWith('_') && filled(v))) };
     // The adapter needs the ids / urls of the current images to keep the ones that stay.
     const extra = {};
     page.fields.forEach((f) => {
-      if (f.type === 'image') extra[`${f.name}_id`] = row[`${f.name}_id`];
+      if (f.type === 'image') extra[`${f.name}_id`] = merged[`${f.name}_id`];
       if (f.type === 'images') {
-        extra[`${f.name}_ids`] = row[`${f.name}_ids`];
-        extra[`${f.name}_urls`] = row[f.name];
+        extra[`${f.name}_ids`] = merged[`${f.name}_ids`];
+        extra[`${f.name}_urls`] = merged[f.name];
       }
     });
-    return reset({ ...blankFor(page.fields), ...Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith('_') && row[k] !== null)), ...extra });
-  }, [open, row, page, reset]);
+    return reset({ ...blankFor(page.fields), ...Object.fromEntries(Object.entries(merged).filter(([k]) => !k.startsWith('_') && merged[k] !== null)), ...extra });
+  }, [open, row, detail, page, reset]);
 
   const save = useAdminMutation((v) => (editing ? svc.update(row.id, v) : svc.create(v)), {
     invalidate: [['resource', page.service]],
@@ -139,7 +148,7 @@ function FormDialog({ page, svc, open, row, onClose }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{tr('إلغاء', 'Cancel')}</Button>
-          <Button type="submit" form={`resource-form-${page.service}`} loading={save.isPending}>{tr('حفظ', 'Save')}</Button>
+          <Button type="submit" form={`resource-form-${page.service}`} loading={save.isPending} disabled={loadingDetail}>{tr('حفظ', 'Save')}</Button>
         </>
       }
     >

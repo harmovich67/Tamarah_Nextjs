@@ -120,15 +120,18 @@ export function makeResource(cfg) {
 const fetchPlain = (path, params) => fetchAll(path, params);
 
 /**
- * Backend settings (`GET /admin/settings` -> [{ key, value, group, type, label }], `POST /admin/settings` with
- * `settings[i][key]` / `settings[i][value]`). Includes switches such as `accept_gift_card_amount`.
+ * Backend settings. `GET /admin/settings` answers grouped (checked on the live server):
+ * `{ social: { label, settings: [{ key, value, group, type, label, is_public }] }, business: {...} }`;
+ * `POST /admin/settings` takes `settings[i][key]` / `settings[i][value]`.
  */
 export const backendSettings = {
   async list() {
-    const rows = await fetchAll(e.adminSettings);
-    return rows
+    const d = unwrap(await api.get(e.adminSettings));
+    const groups = Array.isArray(d) ? [{ settings: d }] : Object.entries(d || {}).map(([key, g]) => ({ key, label: g?.label, settings: g?.settings || [] }));
+    return groups
+      .flatMap((g) => g.settings.map((r) => ({ ...r, groupLabel: g.label || r.group || g.key })))
       .filter((r) => r && r.key)
-      .map((r) => ({ id: r.id, key: r.key, value: r.value ?? '', group: r.group || 'general', type: r.type || 'string', label: r.label || r.key, sort_order: r.sort_order ?? 0 }))
+      .map((r) => ({ id: r.id, key: r.key, value: r.value ?? '', group: r.groupLabel || r.group || 'general', type: r.type || 'string', label: r.label || r.key, isPublic: r.is_public !== false, sort_order: r.sort_order ?? 0 }))
       .sort((a, b) => a.group.localeCompare(b.group) || a.sort_order - b.sort_order);
   },
   /** @param {{ key: string, value: string }[]} changes */
@@ -136,18 +139,18 @@ export const backendSettings = {
 };
 
 /**
- * Roles hold `permissions[]`; the options for the checkboxes come from `GET /admin/permission-not-paginated`
- * ({ id, name, group? }, shaped defensively because the collection has no example).
+ * Roles hold `permissions[]`; the options for the checkboxes come from `GET /admin/permission-not-paginated`, which answers
+ * grouped by module (checked on the live server): `{ "العملاء": [{ id, title }], "المدن": [...] }` in Accept-Language.
  */
 function withPermissions(resource) {
   return {
     ...resource,
     permissionOptions: async () => {
-      const locale = getAdminLocale();
-      return (await fetchAll(e.permissionList, {}, locale)).map((p) => {
-        const label = typeof p.name === 'string' ? p.name : tx(p, 'name', locale) || p.title || p.key || `#${p.id}`;
-        return { id: String(p.id), label, group: String(p.group ?? p.module ?? p.guard_name ?? '').trim() || String(p.key ?? p.name ?? '').split(/[.:_-]/)[0] || 'general' };
-      });
+      const d = unwrap(await api.get(e.permissionList, undefined, { headers: { 'Accept-Language': getAdminLocale() } }));
+      const groups = Array.isArray(d) ? [['', d]] : Object.entries(d || {});
+      return groups.flatMap(([group, list]) =>
+        (Array.isArray(list) ? list : []).map((p) => ({ id: String(p.id), label: p.title || p.name || `#${p.id}`, group: group || p.module || 'general' })),
+      );
     },
   };
 }
@@ -208,6 +211,8 @@ export const resources = {
     fields: [
       { name: 'city_id', kind: 'relation' },
       { name: 'name', kind: 'bilingual' },
+      // The public answer has `phone` / `opening_hours` but the backend ignores them on create / update (checked on the
+      // live server: both stay null), so the form does not offer them.
       { name: 'address' },
       { name: 'longitude' },
       { name: 'latitude' },
@@ -225,6 +230,8 @@ export const resources = {
       { name: 'name', kind: 'bilingual' },
       { name: 'is_active', kind: 'bool' },
     ],
+    // Cities answer `status` (1 / 0) instead of `is_active`, plus `has_private_delivery` (checked on the live server).
+    toRow: (row, raw) => ({ ...row, is_active: raw.is_active === undefined ? isOn(raw.status ?? 1) : isOn(raw.is_active), private_delivery: isOn(raw.has_private_delivery) }),
   }),
   clients: makeResource({
     path: R(e.clients),

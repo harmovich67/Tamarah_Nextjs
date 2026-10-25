@@ -282,6 +282,34 @@ export async function realHomeParts() {
   return { ...parts, ...(banners.length ? { banners } : {}), featureCards: feed.featureCards, reviewCards: feed.reviewCards };
 }
 
+/**
+ * `GET /general/branches` (public, the dashboard "Branches" screen) in ar + en, shaped like `data/branches.js`
+ * (`{ ar: [...], en: [...] }`). Returns null when the backend has none so the page keeps its bundled branches.
+ * Missing phone / opening hours come back empty and the page falls back to the store phone / a dash.
+ */
+export async function getBranches() {
+  try {
+    const [ar, en] = await Promise.all([
+      cached('branches:ar', CATALOG_TTL, () => getData('/general/branches', undefined, 'ar')),
+      cached('branches:en', CATALOG_TTL, () => getData('/general/branches', undefined, 'en').catch(() => null)),
+    ]);
+    if (!Array.isArray(ar) || !ar.length) return null;
+    const enById = new Map((Array.isArray(en) ? en : []).map((b) => [b.id, b]));
+    const shape = (b) => ({
+      id: b.id,
+      city: String(b.city?.name ?? '').trim(),
+      name: b.name || '',
+      address: b.address || '',
+      phone: b.phone || '',
+      hours: b.opening_hours || '',
+      badge: '',
+    });
+    return { ar: ar.map(shape), en: ar.map((b) => shape(enById.get(b.id) || b)) };
+  } catch {
+    return null;
+  }
+}
+
 /** `GET /client/home` in ar + en: the pieces of the home page that the dashboard controls besides the hero banners. */
 async function homeFeed() {
   const empty = { mostOrderedIds: [], featureCards: [], reviewCards: [] };

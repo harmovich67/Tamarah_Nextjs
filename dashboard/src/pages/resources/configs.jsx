@@ -118,8 +118,7 @@ export const RESOURCE_PAGES = {
     fields: [
       { name: 'name', label: ['اسم الفرع', 'Branch name'], type: 'bilingual', required: true },
       { name: 'city_id', label: ['المدينة', 'City'], type: 'select', optionsFrom: 'cities', required: true },
-      { name: 'address', label: ['العنوان', 'Address'], type: 'text', required: true },
-      { name: 'latitude', label: ['خط العرض', 'Latitude'], type: 'number', step: 'any' },
+      { name: 'address', label: ['العنوان', 'Address'], type: 'text', required: true },      { name: 'latitude', label: ['خط العرض', 'Latitude'], type: 'number', step: 'any' },
       { name: 'longitude', label: ['خط الطول', 'Longitude'], type: 'number', step: 'any' },
       { name: 'pickup_enabled', label: ['الاستلام من الفرع مفعّل', 'Pickup enabled'], type: 'switch' },
       { name: 'is_active', label: ['فعّال', 'Active'], type: 'switch' },
@@ -146,7 +145,10 @@ export const RESOURCE_PAGES = {
       { name: 'country_id', label: ['رقم الدولة', 'Country id'], type: 'number', required: true },
       { name: 'is_active', label: ['فعّالة', 'Active'], type: 'switch' },
     ],
-    columns: [{ key: 'name', header: ['المدينة', 'City'], sortValue: (r) => r.name_ar, cell: (r, { locale }) => <b>{loc(r, 'name', locale)}</b> }],
+    columns: [
+      { key: 'name', header: ['المدينة', 'City'], sortValue: (r) => r.name_ar, cell: (r, { locale }) => <b>{loc(r, 'name', locale)}</b> },
+      { key: 'private', header: ['توصيل خاص', 'Private delivery'], align: 'center', cell: (r, { tr }) => yesNo(r.private_delivery, tr) },
+    ],
     rowActions: [{ name: 'privateDelivery', label: ['تفعيل / إيقاف التوصيل الخاص', 'Toggle private delivery'], icon: 'truck' }],
   },
 
