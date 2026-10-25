@@ -350,7 +350,9 @@ export async function getGiftCardOptions() {
   const amounts = (Array.isArray(presets) ? presets : [])
     .filter((p) => p.is_active !== false && Number(p.amount) > 0)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.amount) - Number(b.amount))
-    .map((p) => Number(p.amount));
+    .map((p) => Number(p.amount))
+    // The dashboard can hold two presets with the same amount: the builder keys its buttons by amount.
+    .filter((amount, i, all) => all.indexOf(amount) === i);
   return {
     amounts: amounts.length ? amounts : null,
     acceptCustomAmount: 'accept_gift_card_amount' in settings ? truthy(settings.accept_gift_card_amount) : true,
