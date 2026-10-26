@@ -186,6 +186,9 @@ function fromDetail(arData, enData) {
 }
 
 // ------------------------------------------------------------------------------------------------ catalog
+/** The ar product detail, shared by the product cards and the cart lines (kept five minutes). */
+const productDetail = (id) => cached(`detail-ar:${id}`, 300_000, () => getData(`/client/products/${id}`, undefined, 'ar'));
+
 /**
  * The list answer (`GET /client/products`) has two gaps (checked on the live server): its `image` is always the default
  * placeholder (the pictures uploaded in the dashboard exist only in the product's `gallery`), and it carries no stock (every
@@ -196,12 +199,11 @@ async function withDetails(products) {
   const queue = [...products];
   // One slow answer (~0.7 s, and the server does not speed up under parallel load) per product: a few at a time and kept for
   // five minutes (the stock on a card can lag a little: the product page, the cart and the checkout use the real stock).
-  const detail = (id) => cached(`detail-ar:${id}`, 300_000, () => getData(`/client/products/${id}`, undefined, 'ar'));
   const workers = Array.from({ length: 8 }, async () => {
     while (queue.length) {
       const p = queue.shift();
       try {
-        const { product } = fromDetail(await detail(p.id), null);
+        const { product } = fromDetail(await productDetail(p.id), null);
         if (product.featured_image) p.featured_image = product.featured_image;
         p.stock_quantity = product.stock_quantity;
       } catch {
@@ -531,15 +533,19 @@ function guestToken() {
   return token;
 }
 
-/** Variant prices of products seen in the cart (the backend cart answers 0.00 for them, so read the product). */
-const variantPrices = new Map();
-async function variantPrice(productId, variantId) {
-  const key = `${productId}:${variantId}`;
-  if (!variantPrices.has(key)) {
-    const data = await getData(`/client/products/${productId}`, undefined, 'ar');
-    (data?.product?.variants || []).forEach((v) => variantPrices.set(`${productId}:${v.id}`, round2(v.effective_price ?? v.base_price ?? 0)));
+/**
+ * What the cart answer lacks for a line, read from the product detail: the picture (the cart sends `image: null`, the cards show
+ * the first gallery picture) and, when the cart answers 0.00, the pack price.
+ */
+async function lineDetail(productId, variantId) {
+  if (!productId) return { image: '', price: 0 };
+  try {
+    const product = (await productDetail(productId))?.product || {};
+    const variant = (product.variants || []).find((v) => String(v.id) === String(variantId));
+    return { image: (product.gallery || []).map(imageOf).find(Boolean) || imageOf(product.image), price: variant ? round2(variant.effective_price ?? variant.base_price ?? 0) : 0 };
+  } catch {
+    return { image: '', price: 0 };
   }
-  return variantPrices.get(key) ?? 0;
 }
 
 async function toSummary(data) {
@@ -548,8 +554,9 @@ async function toSummary(data) {
   const items = await Promise.all(
     (data?.items || []).map(async (it) => {
       const v = it.variant || {};
-      let unit = Number(v.final_price ?? v.price) || 0;
-      if (!(unit > 0)) unit = await variantPrice(it.product?.id, v.id);
+      const detail = await lineDetail(it.product?.id, v.id);
+      let unit = Number(v.final_price ?? v.price ?? v.effective_price) || 0;
+      if (!(unit > 0)) unit = detail.price;
       const quantity = Number(it.quantity) || 1;
       return {
         key: String(it.id),
@@ -559,7 +566,7 @@ async function toSummary(data) {
         product_name: it.product?.name || '',
         size_name: weightLabel(v.weight, v.weight_unit, lang),
         sku: '',
-        image: imageOf(it.product?.image),
+        image: detail.image || imageOf(it.product?.image),
         unit_price: unit,
         unit_price_formatted: formatMoney2(unit, locale),
         quantity,
