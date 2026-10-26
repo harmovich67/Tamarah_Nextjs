@@ -137,27 +137,90 @@ export function toOrderItem(i, idx) {
   };
 }
 
-export function toOrder(o) {
-  const items = pick(o, ['items', 'order_items', 'products'], []).map(toOrderItem);
-  const addr = pick(o, ['address', 'shipping_address'], {});
-  const rawDelivery = String(pick(o, ['delivery_type', 'shipping_type', 'delivery_method', 'shipping_method', 'type'], ''));
-  const branch = pick(o, ['branch'], null);
-  const branchId = pick(o, ['branch_id'], null);
-  const line = typeof addr === 'string' ? addr : [addr.street, addr.district, addr.national_address].filter(Boolean).join('، ');
-  const isBranch =
+function extractDeliveryType(o) {
+  const v = pick(o, [
+    'delivery_type',
+    'shipping_type',
+    'delivery_method',
+    'shipping_method',
+    'delivery_option',
+    'shipping_option',
+    'receive_type',
+    'pickup_type',
+    'type',
+    'order_type',
+  ]);
+  if (!v) return '';
+  if (typeof v === 'string') return v.trim().toLowerCase();
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'object') {
+    return String(v.key || v.code || v.value || v.slug || v.type || v.name || v.id || '').trim().toLowerCase();
+  }
+  return String(v).trim().toLowerCase();
+}
+
+function isBranchOrder(o, addressLine = '') {
+  const rawDelivery = extractDeliveryType(o);
+  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
+  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+
+  const hasBranch = Boolean(
+    (branchId && String(branchId) !== '0') ||
+    (branch && typeof branch === 'object' && Object.keys(branch).length > 0) ||
+    (typeof branch === 'string' && branch.trim() !== '') ||
+    o.branch_name
+  );
+
+  const isPickupFlag = Boolean(
+    o.is_pickup === 1 || o.is_pickup === '1' || o.is_pickup === true ||
+    o.is_branch === 1 || o.is_branch === '1' || o.is_branch === true ||
+    o.pickup === 1 || o.pickup === '1' || o.pickup === true ||
+    o.is_delivery === 0 || o.is_delivery === '0' || o.is_delivery === false
+  );
+
+  const isReadyStatus = o.status === 'ready' || o.order_status === 'ready' || o.shipping_status === 'ready';
+
+  const deliveryMatches =
     rawDelivery === 'branch' ||
     rawDelivery === 'branch_pickup' ||
     rawDelivery === 'pickup' ||
+    rawDelivery === 'from_branch' ||
+    rawDelivery === 'store' ||
+    rawDelivery === 'store_pickup' ||
+    rawDelivery === 'boutique' ||
+    rawDelivery === 'takeaway' ||
+    rawDelivery === 'self_pickup' ||
     rawDelivery === '2' ||
-    Boolean(branchId) ||
-    Boolean(branch && typeof branch === 'object') ||
-    line.includes('استلام من الفرع') ||
-    line.includes('الفرع');
+    rawDelivery.includes('فرع') ||
+    rawDelivery.includes('استلام');
 
-  const branchName = branch ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
-  const branchAddress = branch ? (branch.address || '') : pick(o, ['branch_address'], '');
-  const branchCity = branch ? (branch.city?.name || branch.city || '') : '';
-  const city = branchCity || text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], ''));
+  const addrText = typeof o.address === 'string' ? o.address : typeof o.shipping_address === 'string' ? o.shipping_address : addressLine;
+  const notesText = String(o.notes || o.note || '');
+  const textMatches =
+    addrText.includes('فرع') ||
+    addrText.includes('استلام') ||
+    notesText.includes('فرع') ||
+    notesText.includes('استلام');
+
+  const zeroFeeNoAddress = Number(o.shipping_fee ?? o.delivery_fee ?? 0) === 0 && (!addrText || addrText.trim() === '' || addrText === 'العنوان الوطني المسجل');
+
+  return deliveryMatches || hasBranch || isPickupFlag || isReadyStatus || textMatches || zeroFeeNoAddress;
+}
+
+export function toOrder(input) {
+  const o = input?.order && typeof input.order === 'object' ? { ...input.order, ...input } : input || {};
+  const items = pick(o, ['items', 'order_items', 'products'], []).map(toOrderItem);
+  const addr = pick(o, ['address', 'shipping_address'], {});
+  const rawDelivery = extractDeliveryType(o);
+  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
+  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+  const line = typeof addr === 'string' ? addr : [addr.street, addr.district, addr.national_address].filter(Boolean).join('، ');
+  const isBranch = isBranchOrder(o, line);
+
+  const branchName = branch && typeof branch === 'object' ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
+  const branchAddress = branch && typeof branch === 'object' ? (branch.address || '') : pick(o, ['branch_address'], '');
+  const branchCity = branch && typeof branch === 'object' ? (branch.city?.name || branch.city || '') : '';
+  const city = branchCity || text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], '')) || (isBranch ? 'الرياض' : '');
 
   const order = {
     id: o.id,
@@ -166,18 +229,19 @@ export function toOrder(o) {
     customer_name: text(pick(o, ['client.full_name', 'client.name', 'customer_name'], '')),
     customer_phone: String(pick(o, ['client.phone', 'customer_phone'], '')),
     customer_email: pick(o, ['client.email', 'customer_email'], ''),
-    shipping_address: line,
+    shipping_address: isBranch ? (branchAddress || 'استلام مباشر من الفرع المعتمد') : line,
     city,
     governorate: city,
     district: typeof addr === 'object' ? addr.district || '' : '',
     shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'home_delivery'),
     delivery_type: isBranch ? 'branch' : 'delivery',
-    branch_id: branchId || branch?.id || null,
-    branch_name: branchName,
-    branch_address: branchAddress,
-    branch_city: branchCity,
+    is_branch: isBranch,
+    branch_id: branchId || branch?.id || (isBranch ? 1 : null),
+    branch_name: branchName || (isBranch ? 'فرع تمرنا المعتمد' : ''),
+    branch_address: branchAddress || (isBranch ? 'طريق الملك فهد' : ''),
+    branch_city: branchCity || (isBranch ? 'الرياض' : ''),
     subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
-    shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
+    shipping_fee: isBranch ? 0 : num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount', 'discount_amount', 'gift_card_discount']),
     total: num(o, ['total', 'grand_total', 'total_price', 'amount']),
     payment_method: String(pick(o, ['payment_method', 'payment.method'], 'cod')),

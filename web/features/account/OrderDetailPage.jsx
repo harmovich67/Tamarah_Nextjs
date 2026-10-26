@@ -66,12 +66,23 @@ function Body({ data: d, cancel: c }) {
   const showStepper = String(settings.enable_order_tracking_stepper ?? '1') === '1';
   const allowCancel = settings.allow_customer_order_cancellation && STEP1.includes(shippingStatus) && order.payment_status !== 'paid';
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
-  const isBranch =
+  const isBranch = Boolean(
+    order.is_branch ||
     order.shipping_type === 'branch_pickup' ||
     order.shipping_type === 'branch' ||
     order.delivery_type === 'branch' ||
-    Boolean(order.branch_id) ||
-    String(order.shipping_address || '').includes('استلام من الفرع');
+    order.shipping_type === 'pickup' ||
+    order.delivery_type === 'pickup' ||
+    order.is_pickup ||
+    (order.branch_id && String(order.branch_id) !== '0') ||
+    Boolean(order.branch_name) ||
+    String(order.shipping_address || '').includes('فرع') ||
+    String(order.shipping_address || '').includes('استلام') ||
+    String(order.notes || '').includes('فرع') ||
+    String(order.notes || '').includes('استلام') ||
+    order.shipping_status === 'ready' ||
+    (Number(order.shipping_fee || 0) === 0 && (!order.shipping_address || order.shipping_address === 'العنوان الوطني المسجل'))
+  );
 
   const deliverySteps = [
     ['check', tr('تم استلام الطلب', 'Order Confirmed'), tr('تم تسجيل وتأكيد الطلب', 'Order recorded in system')],

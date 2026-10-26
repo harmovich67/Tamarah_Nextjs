@@ -105,6 +105,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [overrideBranch, setOverrideBranch] = useState(null);
   const { register, reset, handleSubmit } = useForm({ defaultValues: { shipping_status: 'pending', payment_status: 'pending' } });
 
   useEffect(() => {
@@ -136,14 +137,27 @@ export default function OrderDetailPage() {
   if (error) return <ErrorState title={tr('تعذر تحميل الطلب', 'Could not load the order')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />;
 
   const { order, items } = data;
-  const isBranch =
+  const detectedIsBranch = Boolean(
+    order.is_branch ||
     order.shipping_type === 'branch_pickup' ||
     order.shipping_type === 'branch' ||
     order.delivery_type === 'branch' ||
-    Boolean(order.branch_id) ||
-    String(order.shipping_address || '').includes('استلام من الفرع');
+    order.shipping_type === 'pickup' ||
+    order.delivery_type === 'pickup' ||
+    order.is_pickup ||
+    (order.branch_id && String(order.branch_id) !== '0') ||
+    Boolean(order.branch_name) ||
+    String(order.shipping_address || '').includes('فرع') ||
+    String(order.shipping_address || '').includes('استلام') ||
+    String(order.notes || '').includes('فرع') ||
+    String(order.notes || '').includes('استلام') ||
+    order.shipping_status === 'ready' ||
+    (Number(order.shipping_fee || 0) === 0 && (!order.shipping_address || order.shipping_address === 'العنوان الوطني المسجل'))
+  );
+
+  const isBranch = overrideBranch !== null ? overrideBranch : detectedIsBranch;
   const currentStatus = order.shipping_status || 'pending';
-  const nextStatus = getNextOrderStatus(currentStatus, order.shipping_type);
+  const nextStatus = getNextOrderStatus(currentStatus, isBranch ? 'branch_pickup' : 'delivery');
   const canCancel = canCancelOrder(currentStatus);
   const isFinal = currentStatus === 'completed' || currentStatus === 'cancelled';
   const paid = order.payment_status === 'paid';
@@ -275,20 +289,31 @@ export default function OrderDetailPage() {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-7 space-y-4">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary-50 text-primary-700 border border-primary-100 flex items-center justify-center"><Icon name="user" className="w-5 h-5" /></div>
+              <div className="w-10 h-10 rounded-2xl bg-primary-50 text-primary-700 border border-primary-100 flex items-center justify-center">
+                <Icon name={isBranch ? 'store' : 'user'} className="w-5 h-5" />
+              </div>
               <div>
-                <h3 className="font-black text-slate-900 text-base">{tr('بيانات العميل والتوصيل', 'Customer & delivery')}</h3>
-                <p className="text-xs text-slate-400">{tr('العنوان المسجل وطريقة الاستلام', 'Saved address and fulfillment')}</p>
+                <h3 className="font-black text-slate-900 text-base">
+                  {isBranch ? tr('بيانات العميل والاستلام', 'Customer & pickup') : tr('بيانات العميل والتوصيل', 'Customer & delivery')}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {isBranch ? tr('مقر الفرع وبيانات المستلم', 'Boutique and recipient details') : tr('العنوان المسجل وطريقة الاستلام', 'Saved address and fulfillment')}
+                </p>
               </div>
             </div>
             <div className="space-y-3 text-sm">
               <div>
                 <span className="text-xs font-bold text-slate-400 block mb-1">{tr('اسم المستلم:', 'Recipient:')}</span>
-                <b className="text-slate-900 font-extrabold text-base block">{order.customer_name}</b>
+                <b className="text-slate-900 font-extrabold text-base block">{order.customer_name || '—'}</b>
               </div>
               <div>
-                <span className="text-xs font-bold text-slate-400 block mb-1">{tr('رقم الجوال للتواصل والمندوب:', 'Phone for the courier:')}</span>
-                <a href={`tel:${order.customer_phone}`} dir="ltr" className="inline-flex items-center gap-2 text-primary-700 hover:underline font-mono font-black text-base"><Icon name="phone" className="w-4 h-4" /><span>{order.customer_phone}</span></a>
+                <span className="text-xs font-bold text-slate-400 block mb-1">
+                  {isBranch ? tr('رقم الجوال للتواصل:', 'Contact phone:') : tr('رقم الجوال للتواصل والمندوب:', 'Phone for the courier:')}
+                </span>
+                <a href={`tel:${order.customer_phone}`} dir="ltr" className="inline-flex items-center gap-2 text-primary-700 hover:underline font-mono font-black text-base">
+                  <Icon name="phone" className="w-4 h-4" />
+                  <span>{order.customer_phone || '—'}</span>
+                </a>
               </div>
               {order.customer_email ? (
                 <div>
@@ -366,7 +391,17 @@ export default function OrderDetailPage() {
 
               {/* Current status display */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <span className="text-[11px] font-bold text-slate-400 block">{tr('الحالة الحالية للطلب:', 'Current status:')}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400 block">{tr('الحالة الحالية للطلب:', 'Current status:')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOverrideBranch(!isBranch)}
+                    className="text-[11px] text-primary-700 hover:text-primary-800 font-bold underline transition"
+                    title={tr('تبديل وضع الاستلام يدوياً', 'Toggle fulfillment mode manually')}
+                  >
+                    {isBranch ? tr('تبديل إلى توصيل مبرد', 'Switch to delivery') : tr('تبديل إلى استلام من الفرع', 'Switch to branch pickup')}
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={cx('text-xs font-black px-3 py-1 rounded-xl border inline-flex items-center gap-1.5', STATUS_BADGES[currentStatus] || STATUS_BADGES.pending)}>
                     <span className="w-2 h-2 rounded-full bg-current" />

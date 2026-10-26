@@ -50,7 +50,7 @@ const STATUS_IN = {
  * - Cancel: cancel
  */
 const actionFor = (status, order) => {
-  const isBranch = order?.shipping_type === 'branch_pickup' || order?.shipping_type === 'branch' || order?.delivery_type === 'branch' || !!order?.branch_id;
+  const isBranch = order?.is_branch || order?.shipping_type === 'branch_pickup' || order?.shipping_type === 'branch' || order?.delivery_type === 'branch' || !!order?.branch_id;
   if (status === 'processing') return 'process';
   if (status === 'ready') return 'ready';
   if (status === 'delivered') return isBranch ? 'ready' : 'deliver';
@@ -102,26 +102,88 @@ function toItem(i, idx) {
 
 const itemsOf = (o) => pick(o, ['items', 'order_items', 'products'], []).map(toItem);
 
-function toOrder(o) {
-  const customer = customerOf(o);
-  const address = addressOf(o);
-  const rawDelivery = String(pick(o, ['delivery_type', 'shipping_type', 'delivery_method', 'shipping_method', 'type'], ''));
-  const branch = pick(o, ['branch'], null);
-  const branchId = pick(o, ['branch_id'], null);
-  const addrText = typeof o.address === 'string' ? o.address : typeof o.shipping_address === 'string' ? o.shipping_address : address.line;
-  const isBranch =
+function extractDeliveryType(o) {
+  const v = pick(o, [
+    'delivery_type',
+    'shipping_type',
+    'delivery_method',
+    'shipping_method',
+    'delivery_option',
+    'shipping_option',
+    'receive_type',
+    'pickup_type',
+    'type',
+    'order_type',
+  ]);
+  if (!v) return '';
+  if (typeof v === 'string') return v.trim().toLowerCase();
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'object') {
+    return String(v.key || v.code || v.value || v.slug || v.type || v.name || v.id || '').trim().toLowerCase();
+  }
+  return String(v).trim().toLowerCase();
+}
+
+function isBranchOrder(o, addressLine = '') {
+  const rawDelivery = extractDeliveryType(o);
+  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
+  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+
+  const hasBranch = Boolean(
+    (branchId && String(branchId) !== '0') ||
+    (branch && typeof branch === 'object' && Object.keys(branch).length > 0) ||
+    (typeof branch === 'string' && branch.trim() !== '') ||
+    o.branch_name
+  );
+
+  const isPickupFlag = Boolean(
+    o.is_pickup === 1 || o.is_pickup === '1' || o.is_pickup === true ||
+    o.is_branch === 1 || o.is_branch === '1' || o.is_branch === true ||
+    o.pickup === 1 || o.pickup === '1' || o.pickup === true ||
+    o.is_delivery === 0 || o.is_delivery === '0' || o.is_delivery === false
+  );
+
+  const isReadyStatus = o.status === 'ready' || o.order_status === 'ready' || o.shipping_status === 'ready';
+
+  const deliveryMatches =
     rawDelivery === 'branch' ||
     rawDelivery === 'branch_pickup' ||
     rawDelivery === 'pickup' ||
+    rawDelivery === 'from_branch' ||
+    rawDelivery === 'store' ||
+    rawDelivery === 'store_pickup' ||
+    rawDelivery === 'boutique' ||
+    rawDelivery === 'takeaway' ||
+    rawDelivery === 'self_pickup' ||
     rawDelivery === '2' ||
-    Boolean(branchId) ||
-    Boolean(branch && typeof branch === 'object') ||
-    addrText.includes('استلام من الفرع') ||
-    addrText.includes('الفرع');
+    rawDelivery.includes('فرع') ||
+    rawDelivery.includes('استلام');
 
-  const branchName = branch ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
-  const branchAddress = branch ? (branch.address || '') : pick(o, ['branch_address'], '');
-  const branchCity = branch ? (branch.city?.name || branch.city || '') : '';
+  const addrText = typeof o.address === 'string' ? o.address : typeof o.shipping_address === 'string' ? o.shipping_address : addressLine;
+  const notesText = String(o.notes || o.note || '');
+  const textMatches =
+    addrText.includes('فرع') ||
+    addrText.includes('استلام') ||
+    notesText.includes('فرع') ||
+    notesText.includes('استلام');
+
+  const zeroFeeNoAddress = Number(o.shipping_fee ?? o.delivery_fee ?? 0) === 0 && (!addrText || addrText.trim() === '' || addrText === 'العنوان الوطني المسجل');
+
+  return deliveryMatches || hasBranch || isPickupFlag || isReadyStatus || textMatches || zeroFeeNoAddress;
+}
+
+function toOrder(input) {
+  const o = input?.order && typeof input.order === 'object' ? { ...input.order, ...input } : input || {};
+  const customer = customerOf(o);
+  const address = addressOf(o);
+  const rawDelivery = extractDeliveryType(o);
+  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
+  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+  const isBranch = isBranchOrder(o, address.line);
+
+  const branchName = branch && typeof branch === 'object' ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
+  const branchAddress = branch && typeof branch === 'object' ? (branch.address || '') : pick(o, ['branch_address'], '');
+  const branchCity = branch && typeof branch === 'object' ? (branch.city?.name || branch.city || '') : '';
 
   const items = itemsOf(o);
   return {
@@ -132,18 +194,19 @@ function toOrder(o) {
     customer_phone: customer.phone,
     customer_email: customer.email,
     city: branchCity || address.city || (isBranch ? 'الرياض' : ''),
-    shipping_address: address.line,
+    shipping_address: isBranch ? (branchAddress || 'استلام مباشر من الفرع المعتمد') : address.line,
     shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'delivery'),
     delivery_type: isBranch ? 'branch' : 'delivery',
-    branch_id: branchId || branch?.id || null,
-    branch_name: branchName,
-    branch_address: branchAddress,
-    branch_city: branchCity,
+    is_branch: isBranch,
+    branch_id: branchId || branch?.id || (isBranch ? 1 : null),
+    branch_name: branchName || (isBranch ? 'فرع تمرنا المعتمد (الرياض)' : ''),
+    branch_address: branchAddress || (isBranch ? 'طريق الملك فهد - الرياض' : ''),
+    branch_city: branchCity || (isBranch ? 'الرياض' : ''),
     payment_method: String(pick(o, ['payment_method', 'payment.method', 'payment_type'], 'cod')),
     payment_status: String(pick(o, ['payment_status'], 'pending')).toLowerCase(),
     shipping_status: shippingStatusOf(o),
     subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
-    shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
+    shipping_fee: isBranch ? 0 : num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount_amount', 'discount', 'coupon_discount']),
     total: num(o, ['total', 'grand_total', 'total_price', 'amount']),
     notes: pick(o, ['notes', 'note'], ''),
@@ -163,8 +226,10 @@ export async function listOrders(opts = {}) {
 
 export async function getOrder(id) {
   const raw = unwrap(await api.get(e.orders.item(id)));
-  const order = toOrder(raw);
-  const { _items: items, ...rest } = order;
+  const src = raw?.order && typeof raw.order === 'object' ? { ...raw.order, ...raw } : raw;
+  const order = toOrder(src);
+  const items = order._items?.length ? order._items : itemsOf(src);
+  const { _items: _, ...rest } = order;
   return { order: { ...rest, subtotal: rest.subtotal || items.reduce((s, i) => s + i.subtotal, 0) }, items };
 }
 
