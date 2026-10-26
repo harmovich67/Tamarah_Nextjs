@@ -17,13 +17,38 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   const previous = useRef(null);
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' };
 
+  const prevOpenRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    if (!open) return undefined;
-    previous.current = document.activeElement;
+    if (!open) {
+      prevOpenRef.current = false;
+      return undefined;
+    }
+    const justOpened = !prevOpenRef.current;
+    prevOpenRef.current = true;
+
+    if (justOpened) {
+      previous.current = document.activeElement;
+    }
     document.body.style.overflow = 'hidden';
-    const t = setTimeout(() => panel.current?.querySelector(FOCUSABLE)?.focus(), 30);
+
+    let t;
+    if (justOpened) {
+      t = setTimeout(() => {
+        // If focus is already inside the modal panel, do not steal it
+        if (!panel.current?.contains(document.activeElement)) {
+          // Prioritize form fields (textarea, input) over close 'X' button
+          const formField = panel.current?.querySelector('textarea, input:not([disabled])');
+          const target = formField || panel.current?.querySelector(FOCUSABLE);
+          target?.focus();
+        }
+      }, 50);
+    }
+
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape') onCloseRef.current?.();
       if (e.key === 'Tab' && panel.current) {
         const nodes = [...panel.current.querySelectorAll(FOCUSABLE)];
         if (!nodes.length) return;
@@ -35,12 +60,14 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
     };
     document.addEventListener('keydown', onKey);
     return () => {
-      clearTimeout(t);
+      if (t) clearTimeout(t);
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onKey);
-      previous.current?.focus?.();
+      if (!open) {
+        previous.current?.focus?.();
+      }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>

@@ -50,7 +50,7 @@ const STATUS_IN = {
  * - Cancel: cancel
  */
 const actionFor = (status, order) => {
-  const isBranch = order?.shipping_type === 'branch_pickup' || order?.delivery_type === 'branch';
+  const isBranch = order?.shipping_type === 'branch_pickup' || order?.shipping_type === 'branch' || order?.delivery_type === 'branch' || !!order?.branch_id;
   if (status === 'processing') return 'process';
   if (status === 'ready') return 'ready';
   if (status === 'delivered') return isBranch ? 'ready' : 'deliver';
@@ -105,7 +105,24 @@ const itemsOf = (o) => pick(o, ['items', 'order_items', 'products'], []).map(toI
 function toOrder(o) {
   const customer = customerOf(o);
   const address = addressOf(o);
-  const delivery = String(pick(o, ['delivery_type', 'shipping_type'], 'delivery'));
+  const rawDelivery = String(pick(o, ['delivery_type', 'shipping_type', 'delivery_method', 'shipping_method', 'type'], ''));
+  const branch = pick(o, ['branch'], null);
+  const branchId = pick(o, ['branch_id'], null);
+  const addrText = typeof o.address === 'string' ? o.address : typeof o.shipping_address === 'string' ? o.shipping_address : address.line;
+  const isBranch =
+    rawDelivery === 'branch' ||
+    rawDelivery === 'branch_pickup' ||
+    rawDelivery === 'pickup' ||
+    rawDelivery === '2' ||
+    Boolean(branchId) ||
+    Boolean(branch && typeof branch === 'object') ||
+    addrText.includes('استلام من الفرع') ||
+    addrText.includes('الفرع');
+
+  const branchName = branch ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
+  const branchAddress = branch ? (branch.address || '') : pick(o, ['branch_address'], '');
+  const branchCity = branch ? (branch.city?.name || branch.city || '') : '';
+
   const items = itemsOf(o);
   return {
     id: o.id,
@@ -114,9 +131,14 @@ function toOrder(o) {
     customer_name: customer.name,
     customer_phone: customer.phone,
     customer_email: customer.email,
-    city: address.city,
+    city: branchCity || address.city || (isBranch ? 'الرياض' : ''),
     shipping_address: address.line,
-    shipping_type: delivery === 'branch' ? 'branch_pickup' : delivery,
+    shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'delivery'),
+    delivery_type: isBranch ? 'branch' : 'delivery',
+    branch_id: branchId || branch?.id || null,
+    branch_name: branchName,
+    branch_address: branchAddress,
+    branch_city: branchCity,
     payment_method: String(pick(o, ['payment_method', 'payment.method', 'payment_type'], 'cod')),
     payment_status: String(pick(o, ['payment_status'], 'pending')).toLowerCase(),
     shipping_status: shippingStatusOf(o),

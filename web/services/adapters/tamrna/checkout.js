@@ -117,6 +117,11 @@ export async function placeOrder(input) {
   }
   const raw = res?.order ?? res;
   const { order, items } = toOrder(raw && typeof raw === 'object' ? raw : {});
+  if (branch) {
+    order.shipping_type = 'branch_pickup';
+    order.delivery_type = 'branch';
+    order.branch_id = input.pickup_branch || order.branch_id;
+  }
   const number = order.order_number || String(raw?.id ?? '');
   rememberPlacedOrder(order, items);
   return { order: { ...order, items }, next: { type: 'order', url: `/order/${encodeURIComponent(number)}` } };

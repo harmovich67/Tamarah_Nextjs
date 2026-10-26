@@ -24,6 +24,13 @@ export default function OrderSuccess({ orderNumber }) {
   if (isLoading) return <LoadingState />;
   if (isError || !data) return <ErrorState onRetry={refetch} message={tr('الطلب غير موجود', 'Order not found')} />;
   const { order, items } = data;
+  const isBranch =
+    order.shipping_type === 'branch_pickup' ||
+    order.shipping_type === 'branch' ||
+    order.delivery_type === 'branch' ||
+    Boolean(order.branch_id) ||
+    String(order.shipping_address || '').includes('استلام من الفرع');
+  const currentStatus = order.shipping_status || 'pending';
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
 
   const copyOrderNumber = () => {
@@ -71,9 +78,13 @@ export default function OrderSuccess({ orderNumber }) {
                 <Icon name={copied ? 'check' : 'copy'} size={13} />
                 {copied && <span style={{ fontSize: '11px', color: '#b7e0cb' }}>{tr('تم النسخ', 'Copied')}</span>}
               </button>
-              {isRtl
-                ? ' وسيتم تجهيز التمور الفاخرة بعناية فائقة ونقلها مبردة للحفاظ على جودتها.'
-                : ' has been placed. Our packers are preparing your dates for chilled luxury delivery.'}
+              {isBranch
+                ? (isRtl
+                    ? ' وسيتم تجهيز التمور الفاخرة بعناية فائقة لتكون جاهزة لاستلامكم من الفرع المعتمد.'
+                    : ' has been placed. Your luxury dates will be prepared with utmost care for boutique pickup.')
+                : (isRtl
+                    ? ' وسيتم تجهيز التمور الفاخرة بعناية فائقة ونقلها مبردة للحفاظ على جودتها.'
+                    : ' has been placed. Our packers are preparing your dates for chilled luxury delivery.')}
             </p>
 
             {/* Quick 4 Stats Grid */}
@@ -106,11 +117,25 @@ export default function OrderSuccess({ orderNumber }) {
 
               <div className="order-stat-box">
                 <span className="order-stat-label">
-                  <Icon name="truck" size={14} />
+                  <Icon name={isBranch ? 'store' : 'truck'} size={14} />
                   <span>{tr('حالة الطلب', 'Order status')}</span>
                 </span>
                 <span className="order-stat-value" style={{ color: '#174a37' }}>
-                  {tr('جاري التجهيز والشحن', 'Processing & cold shipping')}
+                  {isBranch
+                    ? (currentStatus === 'ready'
+                        ? tr('جاهز للاستلام بالفرع', 'Ready for pickup')
+                        : currentStatus === 'completed'
+                        ? tr('تم الاستلام من الفرع', 'Picked up')
+                        : currentStatus === 'cancelled'
+                        ? tr('تم إلغاء الطلب', 'Cancelled')
+                        : tr('جاري التجهيز بالفرع', 'Preparing at branch'))
+                    : (currentStatus === 'delivered'
+                        ? tr('تم التوصيل', 'Delivered')
+                        : currentStatus === 'completed'
+                        ? tr('تم التوصيل بنجاح', 'Delivered successfully')
+                        : currentStatus === 'cancelled'
+                        ? tr('تم إلغاء الطلب', 'Cancelled')
+                        : tr('جاري التجهيز والشحن', 'Processing & cold shipping'))}
                 </span>
               </div>
             </div>
@@ -119,39 +144,71 @@ export default function OrderSuccess({ orderNumber }) {
           {/* 4-Step Order Tracker / Progress */}
           <div className="order-tracker-card" data-no-print>
             <h3 className="order-tracker-title">
-              <Icon name="package-check" size={18} />
-              <span>{tr('مسار تجهيز وشحن الطلب', 'Order fulfillment status')}</span>
+              <Icon name={isBranch ? 'store' : 'package-check'} size={18} />
+              <span>{isBranch ? tr('مسار تجهيز واستلام الطلب', 'Boutique pickup fulfillment status') : tr('مسار تجهيز وشحن الطلب', 'Order fulfillment status')}</span>
             </h3>
 
-            <ol className="order-tracker-steps">
-              <li className="order-tracker-step is-done">
-                <div className="order-tracker-step-circle">
-                  <Icon name="check" size={18} stroke={3} />
-                </div>
-                <span className="order-tracker-step-label">{tr('تم الاستلام', 'Received')}</span>
-              </li>
+            {isBranch ? (
+              <ol className="order-tracker-steps">
+                <li className="order-tracker-step is-done">
+                  <div className="order-tracker-step-circle">
+                    <Icon name="check" size={18} stroke={3} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('تم الاستلام', 'Received')}</span>
+                </li>
 
-              <li className="order-tracker-step is-current">
-                <div className="order-tracker-step-circle">
-                  <Icon name="package" size={18} />
-                </div>
-                <span className="order-tracker-step-label">{tr('جاري التجهيز والتغليف', 'Packaging')}</span>
-              </li>
+                <li className={`order-tracker-step ${currentStatus === 'pending' ? '' : currentStatus === 'processing' ? 'is-current' : 'is-done'}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="package" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('جاري التجهيز بالفرع', 'Preparing')}</span>
+                </li>
 
-              <li className="order-tracker-step">
-                <div className="order-tracker-step-circle">
-                  <Icon name="truck" size={18} />
-                </div>
-                <span className="order-tracker-step-label">{tr('شحن مبرد', 'Chilled shipping')}</span>
-              </li>
+                <li className={`order-tracker-step ${currentStatus === 'ready' ? 'is-current' : currentStatus === 'completed' ? 'is-done' : ''}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="store" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('جاهز للاستلام بالفرع', 'Ready for pickup')}</span>
+                </li>
 
-              <li className="order-tracker-step">
-                <div className="order-tracker-step-circle">
-                  <Icon name="home" size={18} />
-                </div>
-                <span className="order-tracker-step-label">{tr('تم التوصيل', 'Delivered')}</span>
-              </li>
-            </ol>
+                <li className={`order-tracker-step ${currentStatus === 'completed' ? 'is-done is-current' : ''}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="check-circle" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('تم الاستلام', 'Completed')}</span>
+                </li>
+              </ol>
+            ) : (
+              <ol className="order-tracker-steps">
+                <li className="order-tracker-step is-done">
+                  <div className="order-tracker-step-circle">
+                    <Icon name="check" size={18} stroke={3} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('تم الاستلام', 'Received')}</span>
+                </li>
+
+                <li className={`order-tracker-step ${currentStatus === 'pending' ? '' : currentStatus === 'processing' ? 'is-current' : 'is-done'}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="package" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('جاري التجهيز والتغليف', 'Packaging')}</span>
+                </li>
+
+                <li className={`order-tracker-step ${currentStatus === 'delivered' || currentStatus === 'shipped' ? 'is-current' : currentStatus === 'completed' ? 'is-done' : ''}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="truck" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('شحن مبرد', 'Chilled shipping')}</span>
+                </li>
+
+                <li className={`order-tracker-step ${currentStatus === 'completed' ? 'is-done is-current' : ''}`}>
+                  <div className="order-tracker-step-circle">
+                    <Icon name="home" size={18} />
+                  </div>
+                  <span className="order-tracker-step-label">{tr('تم التوصيل', 'Delivered')}</span>
+                </li>
+              </ol>
+            )}
           </div>
 
           {/* Unified Order & Shipping Details Card */}
@@ -182,14 +239,18 @@ export default function OrderSuccess({ orderNumber }) {
 
               <div className="order-shipping-cell">
                 <span className="order-shipping-cell-label">
-                  <Icon name="map-pin" size={14} />
-                  <span>{tr('عنوان التوصيل المعتمد', 'Delivery address')}</span>
+                  <Icon name={isBranch ? 'store' : 'map-pin'} size={14} />
+                  <span>{isBranch ? tr('فرع الاستلام المعتمد', 'Pickup boutique') : tr('عنوان التوصيل المعتمد', 'Delivery address')}</span>
                 </span>
                 <span className="order-shipping-cell-content">
-                  {order.shipping_address || (order.city ? `${order.city} - ${tr('توصيل منزلي', 'Home delivery')}` : tr('العنوان المعتمد للطلب', 'Registered address'))}
+                  {isBranch
+                    ? (order.branch_name || tr('فرع تمرنا المعتمد', 'Authorized Tamrna Boutique')) + (order.city ? ` (${order.city})` : '')
+                    : (order.shipping_address || (order.city ? `${order.city} - ${tr('توصيل منزلي', 'Home delivery')}` : tr('العنوان المعتمد للطلب', 'Registered address')))}
                 </span>
                 <span className="order-shipping-cell-sub" style={{ color: '#174a37', fontWeight: 600 }}>
-                  ❄️ {tr('نقل مبرد لضمان جودة وطزاجة التمور', 'Chilled transport to preserve premium date freshness')}
+                  {isBranch
+                    ? `📍 ${order.branch_address || tr('استلام مباشر من الفرع خلال ساعات العمل الرسمية', 'Direct pickup during business hours')}`
+                    : `❄️ ${tr('نقل مبرد لضمان جودة وطزاجة التمور', 'Chilled transport to preserve premium date freshness')}`}
                 </span>
               </div>
             </div>
@@ -246,8 +307,11 @@ export default function OrderSuccess({ orderNumber }) {
               ) : null}
 
               <div className="order-summary-row">
-                <span>{tr('رسوم الشحن والتوصيل المبرد', 'Chilled shipping fee')}</span>
-                {Number(order.shipping_fee) === 0 ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Icon name={isBranch ? 'store' : 'truck'} size={14} />
+                  <span>{isBranch ? tr('طريقة الاستلام (استلام من الفرع)', 'Fulfillment (Boutique pickup)') : tr('رسوم الشحن والتوصيل المبرد', 'Chilled shipping fee')}</span>
+                </span>
+                {isBranch || Number(order.shipping_fee) === 0 ? (
                   <span className="order-free-chip">{tr('مجاناً', 'FREE')}</span>
                 ) : (
                   <strong>{money(order.shipping_fee)}</strong>

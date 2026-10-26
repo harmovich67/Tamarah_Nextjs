@@ -30,6 +30,72 @@ const NEXT_STEP_ICONS = {
   completed: 'check-circle-2',
 };
 
+function CancelOrderModal({ open, onClose, onConfirm, isPending }) {
+  const { tr } = useT();
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (open) setReason('');
+  }, [open]);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="sm"
+      title={tr('تأكيد إلغاء الطلب', 'Confirm Order Cancellation')}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+          >
+            {tr('تراجع', 'Back')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(reason)}
+            disabled={isPending}
+            className="px-4 py-2.5 text-xs font-black rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition flex items-center gap-1.5"
+          >
+            {isPending ? <Icon name="loader-2" className="w-3.5 h-3.5 animate-spin" /> : null}
+            <span>{tr('تأكيد الإلغاء', 'Confirm cancellation')}</span>
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <Icon name="alert-triangle" className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-900 leading-snug">
+              {tr('هل أنت متأكد من إلغاء هذا الطلب؟', 'Are you sure you want to cancel this order?')}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {tr('سيتم تحويل حالة الطلب إلى ملغي وإيقاف التجهيز فوراً.', 'The order will be marked as cancelled and processing stopped.')}
+            </p>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1.5">
+            {tr('سبب الإلغاء (اختياري):', 'Cancellation reason (optional):')}
+          </label>
+          <textarea
+            rows={2}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={tr('مثال: طلب العميل إلغاء الطلب / خطأ في العنوان…', 'e.g. Customer requested cancellation / address error…')}
+            className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /** Order detail + status control (resources/views/admin/order_detail.php). */
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -39,7 +105,6 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const { register, reset, handleSubmit } = useForm({ defaultValues: { shipping_status: 'pending', payment_status: 'pending' } });
 
   useEffect(() => {
@@ -71,7 +136,12 @@ export default function OrderDetailPage() {
   if (error) return <ErrorState title={tr('تعذر تحميل الطلب', 'Could not load the order')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />;
 
   const { order, items } = data;
-  const isBranch = order.shipping_type === 'branch_pickup' || order.delivery_type === 'branch';
+  const isBranch =
+    order.shipping_type === 'branch_pickup' ||
+    order.shipping_type === 'branch' ||
+    order.delivery_type === 'branch' ||
+    Boolean(order.branch_id) ||
+    String(order.shipping_address || '').includes('استلام من الفرع');
   const currentStatus = order.shipping_status || 'pending';
   const nextStatus = getNextOrderStatus(currentStatus, order.shipping_type);
   const canCancel = canCancelOrder(currentStatus);
@@ -85,13 +155,13 @@ export default function OrderDetailPage() {
     if (status === 'ready') return tr('جاهز للاستلام من الفرع', 'Ready for branch pickup');
     if (status === 'delivered') return tr('تم التوصيل للعميل', 'Delivered to customer');
     if (status === 'processing') return isBranch ? tr('قيد التجهيز في الفرع', 'Preparing at branch') : tr('قيد التجهيز بالمستودع', 'Preparing in warehouse');
+    if (status === 'completed') return isBranch ? tr('تم الاستلام من الفرع', 'Picked up from branch') : tr('مكتمل', 'Completed');
     return tr(ORDER_STATUS_LABELS[status]?.ar || status, ORDER_STATUS_LABELS[status]?.en || status);
   };
 
-  const handleCancelConfirm = () => {
-    update.mutate({ shipping_status: 'cancelled', reason: cancelReason });
+  const handleCancelConfirm = (reason) => {
+    update.mutate({ shipping_status: 'cancelled', reason });
     setConfirmCancel(false);
-    setCancelReason('');
   };
 
   return (
@@ -180,7 +250,7 @@ export default function OrderDetailPage() {
                   <Icon name={isBranch ? 'store' : 'truck'} className="w-4 h-4 text-gold-700" />
                   <span>
                     {isBranch
-                      ? tr('الاستلام من الفرع:', 'Branch pickup:')
+                      ? tr('طريقة الاستلام (استلام من الفرع):', 'Fulfillment (Branch pickup):')
                       : tr(`رسوم الشحن والتوصيل (${order.city || 'الرياض'}):`, `Shipping & delivery (${order.city || 'Riyadh'}):`)}
                   </span>
                 </span>
@@ -227,16 +297,41 @@ export default function OrderDetailPage() {
                 </div>
               ) : null}
               <div className="pt-2 border-t border-slate-100">
-                <span className="text-xs font-bold text-slate-400 block mb-1">{tr('طريقة الاستلام والعنوان:', 'Fulfillment & address:')}</span>
+                <span className="text-xs font-bold text-slate-400 block mb-1">
+                  {isBranch ? tr('طريقة الاستلام ومقر الفرع:', 'Pickup & boutique details:') : tr('طريقة الاستلام والعنوان:', 'Fulfillment & address:')}
+                </span>
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-slate-800 leading-relaxed font-medium">
-                  <p className="text-primary-700 font-black mb-1 flex items-center gap-1.5">
-                    <Icon name={isBranch ? 'store' : 'map-pin'} className="w-4 h-4" />
-                    <span>{order.city || tr('المملكة العربية السعودية', 'Saudi Arabia')}</span>
-                    <span className="text-xs text-gold-700 font-normal">
-                      ({isBranch ? tr('استلام من الفرع', 'Branch pickup') : tr('توصيل مبرد للمنزل', 'Chilled delivery')})
-                    </span>
-                  </p>
-                  <p className="text-xs text-slate-600">{order.shipping_address || tr('العنوان الوطني المسجل', 'Registered national address')}</p>
+                  {isBranch ? (
+                    <>
+                      <p className="text-primary-700 font-black mb-1 flex items-center gap-1.5">
+                        <Icon name="store" className="w-4 h-4" />
+                        <span>{order.branch_name || tr('فرع تمرنا المعتمد', 'Authorized Tamrna Boutique')}</span>
+                        <span className="text-xs text-gold-700 font-bold">
+                          ({tr('استلام مباشر من الفرع - مجاناً', 'Direct boutique pickup - Free')})
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-1.5">
+                        <Icon name="map-pin" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>
+                          {order.branch_address || (order.city ? `${tr('الفرع المعتمد بمدينة', 'Boutique in')} ${order.city}` : tr('فرع الرياض الرئيسي (طريق الملك فهد)', 'Main Riyadh Boutique (King Fahd Rd)'))}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1 font-normal">
+                        {tr('يتم تسليم الطلب للعميل داخل الفرع عند الحضور.', 'Order will be handed over to the customer at the boutique.')}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-primary-700 font-black mb-1 flex items-center gap-1.5">
+                        <Icon name="map-pin" className="w-4 h-4" />
+                        <span>{order.city || tr('المملكة العربية السعودية', 'Saudi Arabia')}</span>
+                        <span className="text-xs text-gold-700 font-normal">
+                          ({tr('توصيل مبرد للمنزل', 'Chilled delivery')})
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-600">{order.shipping_address || tr('العنوان الوطني المسجل', 'Registered national address')}</p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="pt-2 border-t border-slate-100">
@@ -408,60 +503,12 @@ export default function OrderDetailPage() {
       />
 
       {/* Confirmation modal for order cancellation */}
-      <Modal
+      <CancelOrderModal
         open={confirmCancel}
         onClose={() => setConfirmCancel(false)}
-        size="sm"
-        title={tr('تأكيد إلغاء الطلب', 'Confirm Order Cancellation')}
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setConfirmCancel(false)}
-              className="px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
-            >
-              {tr('تراجع', 'Back')}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelConfirm}
-              disabled={update.isPending}
-              className="px-4 py-2.5 text-xs font-black rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition flex items-center gap-1.5"
-            >
-              {update.isPending ? <Icon name="loader-2" className="w-3.5 h-3.5 animate-spin" /> : null}
-              <span>{tr('تأكيد الإلغاء', 'Confirm cancellation')}</span>
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-              <Icon name="alert-triangle" className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900 leading-snug">
-                {tr('هل أنت متأكد من إلغاء هذا الطلب؟', 'Are you sure you want to cancel this order?')}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                {tr('سيتم تحويل حالة الطلب إلى ملغي وإيقاف التجهيز فوراً.', 'The order will be marked as cancelled and processing stopped.')}
-              </p>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1.5">
-              {tr('سبب الإلغاء (اختياري):', 'Cancellation reason (optional):')}
-            </label>
-            <textarea
-              rows={2}
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder={tr('مثال: طلب العميل إلغاء الطلب / خطأ في العنوان…', 'e.g. Customer requested cancellation / address error…')}
-              className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
-            />
-          </div>
-        </div>
-      </Modal>
+        onConfirm={handleCancelConfirm}
+        isPending={update.isPending}
+      />
     </div>
   );
 }

@@ -140,9 +140,25 @@ export function toOrderItem(i, idx) {
 export function toOrder(o) {
   const items = pick(o, ['items', 'order_items', 'products'], []).map(toOrderItem);
   const addr = pick(o, ['address', 'shipping_address'], {});
-  const delivery = String(pick(o, ['delivery_type', 'shipping_type'], 'delivery'));
-  const city = text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], ''));
+  const rawDelivery = String(pick(o, ['delivery_type', 'shipping_type', 'delivery_method', 'shipping_method', 'type'], ''));
+  const branch = pick(o, ['branch'], null);
+  const branchId = pick(o, ['branch_id'], null);
   const line = typeof addr === 'string' ? addr : [addr.street, addr.district, addr.national_address].filter(Boolean).join('، ');
+  const isBranch =
+    rawDelivery === 'branch' ||
+    rawDelivery === 'branch_pickup' ||
+    rawDelivery === 'pickup' ||
+    rawDelivery === '2' ||
+    Boolean(branchId) ||
+    Boolean(branch && typeof branch === 'object') ||
+    line.includes('استلام من الفرع') ||
+    line.includes('الفرع');
+
+  const branchName = branch ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
+  const branchAddress = branch ? (branch.address || '') : pick(o, ['branch_address'], '');
+  const branchCity = branch ? (branch.city?.name || branch.city || '') : '';
+  const city = branchCity || text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], ''));
+
   const order = {
     id: o.id,
     order_number: String(pick(o, ['order_number', 'number', 'code', 'id'], '')),
@@ -154,7 +170,12 @@ export function toOrder(o) {
     city,
     governorate: city,
     district: typeof addr === 'object' ? addr.district || '' : '',
-    shipping_type: delivery === 'branch' ? 'branch_pickup' : 'home_delivery',
+    shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'home_delivery'),
+    delivery_type: isBranch ? 'branch' : 'delivery',
+    branch_id: branchId || branch?.id || null,
+    branch_name: branchName,
+    branch_address: branchAddress,
+    branch_city: branchCity,
     subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
     shipping_fee: num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount', 'discount_amount', 'gift_card_discount']),

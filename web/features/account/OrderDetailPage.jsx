@@ -66,12 +66,28 @@ function Body({ data: d, cancel: c }) {
   const showStepper = String(settings.enable_order_tracking_stepper ?? '1') === '1';
   const allowCancel = settings.allow_customer_order_cancellation && STEP1.includes(shippingStatus) && order.payment_status !== 'paid';
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
-  const steps = [
+  const isBranch =
+    order.shipping_type === 'branch_pickup' ||
+    order.shipping_type === 'branch' ||
+    order.delivery_type === 'branch' ||
+    Boolean(order.branch_id) ||
+    String(order.shipping_address || '').includes('استلام من الفرع');
+
+  const deliverySteps = [
     ['check', tr('تم استلام الطلب', 'Order Confirmed'), tr('تم تسجيل وتأكيد الطلب', 'Order recorded in system')],
     ['package', tr('التجهيز والتغليف المبرد', 'Cold Packaging'), tr('فرز وتغليف التمور الفاخرة', 'Fresh sorting and sealing')],
     ['truck', tr('خرج للشحن المبرد', 'Out for Delivery'), tr('مع مندوب الشحن المبرد', 'In refrigerated transit')],
     ['tree-palm', tr('تم التسليم', 'Delivered'), tr('بالصحة والعافية', 'Enjoy your royal dates')],
   ];
+
+  const branchSteps = [
+    ['check', tr('تم استلام الطلب', 'Order Confirmed'), tr('تم تسجيل وتأكيد الطلب', 'Order recorded in system')],
+    ['package', tr('التجهيز بالفرع', 'Boutique Packaging'), tr('فرز وتجهيز التمور الفاخرة', 'Fresh sorting and packaging')],
+    ['store', tr('جاهز للاستلام بالفرع', 'Ready for Pickup'), tr('الطلب بانتظار استلامكم من الفرع', 'Awaiting your pickup at boutique')],
+    ['tree-palm', tr('تم الاستلام', 'Picked Up'), tr('بالصحة والعافية', 'Enjoy your royal dates')],
+  ];
+
+  const steps = isBranch ? branchSteps : deliverySteps;
   const paidOnline = ['mada', 'apple_pay', 'tamara', 'tabby', 'card', 'paymob', 'credit_card'].includes(order.payment_method);
   const methodLabel = paidOnline
     ? order.payment_method === 'apple_pay' ? 'أبل باي Apple Pay' : order.payment_method === 'tamara' ? 'تمارا Tamara' : order.payment_method === 'tabby' ? 'تابي Tabby' : 'مدى / بطاقة بنكية'
@@ -92,7 +108,7 @@ function Body({ data: d, cancel: c }) {
 
       {showStepper && shippingStatus !== 'cancelled' ? (
         <section className="account-card">
-          <header><span><Icon name="snowflake" size={21} /></span><h2>{tr('مراحل تجهيز وشحن الطلب المبرد', 'Cold Freight Tracking Timeline')}</h2></header>
+          <header><span><Icon name={isBranch ? 'store' : 'snowflake'} size={21} /></span><h2>{isBranch ? tr('مراحل تجهيز واستلام الطلب من الفرع', 'Boutique Pickup Tracking Timeline') : tr('مراحل تجهيز وشحن الطلب المبرد', 'Cold Freight Tracking Timeline')}</h2></header>
           <ol className="order-steps">
             {steps.map(([icon, title, desc], i) => (
               <li key={title} className={`${step >= i + 1 ? 'is-done' : ''} ${step === i + 1 ? 'is-current' : ''}`.trim()}>
@@ -107,7 +123,7 @@ function Body({ data: d, cancel: c }) {
         <Flash type="error" icon="alert-octagon"><strong>{tr('تم إلغاء هذا الطلب بناء على طلب العميل أو الإدارة.', 'This order has been cancelled.')}</strong></Flash>
       ) : null}
 
-      {config.apiMode === 'laravel' && shippingStatus === 'delivered' ? <ReviewForm order={order} /> : null}
+      {config.apiMode === 'laravel' && (shippingStatus === 'delivered' || shippingStatus === 'completed') ? <ReviewForm order={order} /> : null}
 
       <div className="account-order-detail-grid">
         <section className="account-card">
@@ -136,22 +152,35 @@ function Body({ data: d, cancel: c }) {
 
         <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
           <section className="account-card">
-            <header><span><Icon name="map-pin" size={21} /></span><h2>{tr('عنوان التوصيل الوطني', 'Delivery Address')}</h2></header>
+            <header><span><Icon name={isBranch ? 'store' : 'map-pin'} size={21} /></span><h2>{isBranch ? tr('فرع الاستلام المعتمد', 'Pickup Boutique') : tr('عنوان التوصيل الوطني', 'Delivery Address')}</h2></header>
             <div className="account-address-grid" style={{ gridTemplateColumns: '1fr' }}>
               <article style={{ minHeight: 0 }}>
                 <h3>{order.customer_name}</h3>
                 <p dir="ltr" style={{ textAlign: 'start' }}>{order.customer_phone}</p>
-                <p>{order.shipping_address}</p>
-                <small>{order.city || 'المملكة العربية السعودية'}</small>
+                {isBranch ? (
+                  <>
+                    <p style={{ fontWeight: 700, color: '#174a37', marginTop: 4 }}>
+                      🏪 {order.branch_name || tr('فرع تمرنا المعتمد', 'Authorized Tamrna Boutique')} {order.city ? `(${order.city})` : ''}
+                    </p>
+                    <small style={{ color: '#4b5563', display: 'block', marginTop: 2 }}>
+                      {order.branch_address || tr('استلام مباشر من الفرع خلال ساعات العمل الرسمية', 'Direct pickup during business hours')}
+                    </small>
+                  </>
+                ) : (
+                  <>
+                    <p>{order.shipping_address}</p>
+                    <small>{order.city || 'المملكة العربية السعودية'}</small>
+                  </>
+                )}
               </article>
             </div>
-            {order.notes ? <div className="account-review-note" style={{ margin: '12px 0 0' }}><b>{tr('ملاحظات التوصيل', 'Delivery Notes')}:</b> {order.notes}</div> : null}
+            {order.notes ? <div className="account-review-note" style={{ margin: '12px 0 0' }}><b>{tr('ملاحظات الطلب', 'Order Notes')}:</b> {order.notes}</div> : null}
           </section>
 
           <section className="account-card">
             <header><span><Icon name="file-text" size={21} /></span><h2>{tr('ملخص الدفع والحساب', 'Payment Summary')}</h2></header>
             <div className="summary-row"><span>{tr('مجموع المنتجات', 'Subtotal')}</span><strong>{money(order.subtotal)}</strong></div>
-            <div className="summary-row"><span>{tr('رسوم الشحن المبرد', 'Cold Express Delivery')}</span><strong>{Number(order.shipping_fee) === 0 ? tr('مجاناً', 'Free') : money(order.shipping_fee)}</strong></div>
+            <div className="summary-row"><span>{isBranch ? tr('طريقة الاستلام (الفرع)', 'Fulfillment (Boutique pickup)') : tr('رسوم الشحن المبرد', 'Cold Express Delivery')}</span><strong>{isBranch || Number(order.shipping_fee) === 0 ? tr('مجاناً', 'Free') : money(order.shipping_fee)}</strong></div>
             {Number(order.discount) > 0 && <div className="summary-row summary-row--discount"><span>{tr('خصم خاص', 'Special Discount')}</span><strong>-{money(order.discount)}</strong></div>}
             <div className="summary-row summary-row--total"><span>{tr('المبلغ الإجمالي الكلي', 'Grand Total')}</span><strong>{money(order.total)}</strong></div>
             <div className="checkout-delivery-summary">
