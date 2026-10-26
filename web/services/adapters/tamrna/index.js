@@ -132,8 +132,9 @@ function fromListRow(ar, en) {
 
 /**
  * `tracked`: some pack of the product reports a stock above zero. The public answer gives `stock: 0` for the packs of EVERY product,
- * including products the dashboard holds stock for (their stock is kept on the product, which the public answer does not expose;
- * checked on the live server, the checkout then sells them). So a 0 on all packs means "unknown" and the pack counts as available;
+ * including products the dashboard holds stock for (their stock is kept on the product as a weight in grams, which the public answer
+ * does not expose; checked on the live server, the checkout sells as many packs as that weight covers). So a 0 on all packs means
+ * "unknown" and the pack counts as available;
  * the checkout answers 422 when there is really no stock. Only when a pack reports a positive stock are the numbers trusted.
  */
 function mapVariant(v, productStock, tracked = false) {

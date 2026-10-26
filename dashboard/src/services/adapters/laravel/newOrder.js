@@ -1,5 +1,6 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
+import { packsFromGrams } from '@/lib/stock';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchPage, isOn, listFilters, tx, withFormErrors } from './tamrna';
 
@@ -43,14 +44,19 @@ export async function listProductChoices() {
   return rows.filter((p) => isOn(p.is_published ?? true) && p.availability !== 'unavailable').map((p) => ({ id: p.id, name: p.name || tx(p, 'name', 'ar') || `#${p.id}` }));
 }
 
-/** The packs (variants) of a product: `GET /admin/products/{id}` carries them. */
+/**
+ * The packs (variants) of a product: `GET /admin/products/{id}` carries them. `stock` is the number of packs the checkout will
+ * sell: a box keeps it per pack, a regular product keeps grams on the product (lib/stock.js).
+ */
 export async function listVariants(productId) {
   const raw = unwrap(await api.get(e.products.item(productId)));
-  return (raw?.variants || []).map((v) => ({
+  const product = raw?.product ?? raw;
+  const box = isOn(product?.is_box);
+  return (product?.variants || []).map((v) => ({
     id: v.id,
     label: `${v.weight == null ? '' : Number(v.weight)} ${v.weight_unit ?? ''}`.trim() || `#${v.id}`,
     price: Number(v.effective_price ?? v.base_price ?? 0),
-    stock: v.stock == null ? null : Number(v.stock),
+    stock: box ? (v.stock == null ? null : Number(v.stock)) : packsFromGrams(product?.stock, v.weight, v.weight_unit),
     isDefault: isOn(v.is_default),
   }));
 }

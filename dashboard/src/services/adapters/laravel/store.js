@@ -1,5 +1,6 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
+import { packsFromGrams } from '@/lib/stock';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchAllBilingual, fetchPage, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
 
@@ -107,11 +108,15 @@ const defaultVariant = (variants) => variants.find((v) => isOn(v.is_default)) ||
 const numOrNull = (x) => (x === null || x === undefined || x === '' ? null : Number(x));
 
 /**
- * Stock shown in the list. Box products (is_box) keep it inside each variant, the others in the product's own stock.
+ * Stock shown in the list, in packs. Box products (is_box) keep it inside each variant. The others keep one stock in GRAMS
+ * (see lib/stock.js): it is shown as the number of default packs it covers, which is what the checkout will sell.
  * The list endpoint only carries the default variant, so for a box product with several packs this is a lower bound.
  */
 function totalStock(p, variants, def) {
-  if (!isOn(p.is_box)) return numOrNull(p.stock);
+  if (!isOn(p.is_box)) {
+    const grams = numOrNull(p.stock);
+    return def ? packsFromGrams(grams, def.weight, def.weight_unit) ?? grams : grams;
+  }
   const known = (variants.length ? variants : def ? [def] : []).map((v) => numOrNull(v.stock)).filter((n) => n !== null);
   return known.length ? known.reduce((a, b) => a + b, 0) : null;
 }
@@ -164,6 +169,7 @@ function toProductRow(p, categories) {
     min_price: min,
     max_price: max,
     total_stock: totalStock(p, variants, def),
+    stock_grams: isOn(p.is_box) ? null : numOrNull(p.stock),
     stock_out: !!p.stock_status?.is_out_of_stock,
     is_box: isOn(p.is_box),
     is_preorder: p.availability === 'preorder',

@@ -9,6 +9,7 @@ import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { storeService } from '@/services';
 import { productSchema } from '@/schemas';
 import { config } from '@/lib/config';
+import { gramsLabel, packsFromGrams } from '@/lib/stock';
 
 // Tamrna backend: variants are weight + unit + price (+ % discount), images are a gallery, no stock / badge / sale price.
 const isLaravel = config.apiMode === 'laravel';
@@ -245,6 +246,18 @@ export default function ProductFormPage() {
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
   const isPreorder = useWatch({ control, name: 'is_preorder' });
   const isBox = useWatch({ control, name: 'is_box' });
+  // The stock of a regular product is grams (lib/stock.js): say how many packs of each weight it covers.
+  const stockGrams = useWatch({ control, name: 'stock_quantity' });
+  const watchedVariants = useWatch({ control, name: 'variants' });
+  const stockHint = (() => {
+    if (stockGrams === '' || stockGrams === undefined || stockGrams === null) return tr('أدخل الوزن الكلي المتوفر بالجرام (مثال: 5000 = 5 كجم).', 'Enter the total weight in stock, in grams (e.g. 5000 = 5 kg).');
+    const parts = (watchedVariants || [])
+      .map((v) => ({ v, n: packsFromGrams(stockGrams, v?.weight, v?.weight_unit) }))
+      .filter(({ n }) => n !== null)
+      .map(({ v, n }) => `${n} ${tr('عبوة', 'packs')} × ${Number(v.weight)} ${v.weight_unit === 'kg' ? tr('كجم', 'kg') : v.weight_unit === 't' ? tr('طن', 't') : tr('جرام', 'g')}`);
+    const total = gramsLabel(stockGrams, tr);
+    return parts.length ? `${total} = ${parts.join(tr(' أو ', ' or '))}` : total;
+  })();
   const categories = data?.categories || [];
 
   useEffect(() => {
@@ -362,12 +375,29 @@ export default function ProductFormPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField label={tr('الباركود', 'Barcode')} placeholder="6281234567890" dir="ltr" inputClassName="font-mono" error={err('sku')} {...register('sku')} />
-                {!isBox && <TextField label={tr('الكمية بالمخزون', 'Stock quantity')} required type="number" min="0" error={err('stock_quantity')} inputClassName="font-bold" {...register('stock_quantity')} />}
+                {!isBox && (
+                  <TextField
+                    label={tr('المخزون بالجرام', 'Stock (grams)')}
+                    required
+                    type="number"
+                    min="0"
+                    hint={stockHint}
+                    error={err('stock_quantity')}
+                    inputClassName="font-bold"
+                    {...register('stock_quantity')}
+                  />
+                )}
               </div>
               <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
                 <CheckField
                   label={tr('منتج بوكس: المخزون لكل عبوة على حدة', 'Box product: stock is tracked per pack')}
-                  hint={isBox ? tr('أدخل الكمية داخل كل عبوة (Variant) أدناه.', 'Enter the quantity inside each pack (variant) below.') : tr('بدون تفعيل: مخزون واحد للمنتج كله (الحقل أعلاه).', 'Off: one stock for the whole product (the field above).')}
+                  hint={
+                    isBox
+                      ? // Checked on the live server: the backend requires the per-pack stock of a box product but saves 0, so the
+                        // checkout refuses every box ("Available: 0") until the backend is fixed.
+                        tr('تنبيه: الخادم حالياً لا يحفظ مخزون العبوات، فمنتج البوكس يُرفض عند إتمام الطلب. استخدم المخزون بالجرام (بدون تفعيل) حتى يُصلح الباك اند.', 'Warning: the backend does not save the per-pack stock yet, so a box product is refused at checkout. Use the stock in grams (box off) until the backend is fixed.')
+                      : tr('بدون تفعيل: مخزون واحد للمنتج كله بالجرام (الحقل أعلاه)، يُخصم منه وزن العبوة مع كل بيع.', 'Off: one stock for the whole product in grams (the field above); each sale takes the pack weight off it.')
+                  }
                   {...register('is_box')}
                 />
               </div>
