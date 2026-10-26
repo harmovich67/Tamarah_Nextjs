@@ -5,6 +5,13 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@tamrna/shared/components/Icon';
 import { ORDER_STATUS_LABELS } from '@tamrna/shared/constants';
+
+/** A pickup order is never "shipped": it is prepared at the branch, ready to collect, then picked up. */
+const BRANCH_STATUS_LABELS = {
+  processing: { ar: 'جاري التجهيز بالفرع', en: 'Preparing at the branch' },
+  shipped: { ar: 'جاهز للاستلام بالفرع', en: 'Ready for pickup' },
+  delivered: { ar: 'تم الاستلام من الفرع', en: 'Picked up' },
+};
 import { numberFormat } from '@tamrna/shared/utils';
 import { useLocale } from '@/components/LocaleProvider';
 import { ErrorState, LoadingState } from '@/components/ui/States';
@@ -72,7 +79,7 @@ export default function OrdersPage() {
                     <article className="account-order-card" key={order.id}>
                       <header>
                         <div><small>{tr('رقم الطلب', 'Order number')}</small><b dir="ltr">{order.order_number}</b></div>
-                        <em data-status={status}>{ORDER_STATUS_LABELS[status]?.[locale] || status}</em>
+                        <em data-status={status}>{(order.shipping_type === 'branch_pickup' && BRANCH_STATUS_LABELS[status]?.[locale]) || ORDER_STATUS_LABELS[status]?.[locale] || status}</em>
                       </header>
                       {items.length > 0 && (
                         <div className="account-order-products">
@@ -101,7 +108,10 @@ export default function OrdersPage() {
                         <div className="account-order-tracking"><span>{tr('رقم التتبع', 'Tracking number')}</span><b dir="ltr">{order.tracking_number}</b></div>
                       ) : null}
                       <div className="account-order-tracking">
-                        <span><Icon name="snowflake" size={14} /> {tr('شحن مبرد فاخر', 'Cold Express Delivery')}</span>
+                        <span>
+                          <Icon name={order.shipping_type === 'branch_pickup' ? 'store' : 'snowflake'} size={14} />{' '}
+                          {order.shipping_type === 'branch_pickup' ? tr('استلام من الفرع', 'Boutique pickup') : tr('شحن مبرد فاخر', 'Cold Express Delivery')}
+                        </span>
                         <Link className="button button--outline button--sm" href={`/profile/order/${order.order_number}`}>
                           {tr('تفاصيل وتتبع الطلب', 'Order Details')}
                           <Icon name="arrow-left" size={15} className="directional-arrow" />

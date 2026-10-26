@@ -29,15 +29,22 @@ export function useCartActions() {
       onSuccess: (res) => {
         if (res?.cart) qc.setQueryData(cartKey, res.cart);
         else qc.invalidateQueries({ queryKey: cartKey });
-        if (!silent && res?.message) showToast(res.message, 'success');
-        if (openDrawer) openOverlay('cart-drawer');
+        // A stock warning ("only 2 available", "last piece"): the cart is already corrected, so it is news, not an error.
+        if (res?.warning) showToast(res.warning, 'info');
+        else if (!silent && res?.message) showToast(res.message, 'success');
+        if (openDrawer && !(res?.warning && !res?.cart?.count)) openOverlay('cart-drawer');
       },
-      onError: (error) => showToast(toFriendlyMessage(error, locale), 'error'),
+      onError: (error) => {
+        showToast(toFriendlyMessage(error, locale), 'error');
+        // A refused add may have touched the cart on the way (it is put back): read it again.
+        qc.invalidateQueries({ queryKey: cartKey });
+      },
     });
 
   return {
     add: make((input) => cartService.addItem(input), { openDrawer: true }),
     update: make((input) => cartService.updateItem(input), { silent: true }),
+    fit: make((input) => cartService.fitItem(input), { silent: true }),
     remove: make((input) => cartService.removeItem(input), { silent: true }),
     clear: make(() => cartService.clearCart(), { silent: true }),
     applyCoupon: make((input) => cartService.applyCoupon(input)),

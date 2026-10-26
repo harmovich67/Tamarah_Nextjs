@@ -26,12 +26,26 @@ function sessionFrom(res, fallback) {
   return { token, user: toUser(data, fallback) };
 }
 
+/**
+ * Checked on the live server: the sign-in / verification answer carries no name (`full_name: null`, no first / last name) while
+ * `GET /client/profile` does. The profile is read once with the new token so the session already knows the customer's name
+ * (the checkout form, the header and the account pages use it). Without the profile the session stays as it was.
+ */
+async function withProfile(session) {
+  try {
+    const profile = unwrap(await api.get('/client/profile', undefined, { headers: { Authorization: `Bearer ${session.token}` } }));
+    return { ...session, user: toUser(profile, session.user) };
+  } catch {
+    return session;
+  }
+}
+
 export async function login({ identity, password, phone_code }) {
   const id = String(identity || '').trim();
   // The backend requires `phone_code` on EVERY sign-in, also with an e-mail (422 "حقل كود الدول مطلوب", checked on the live server).
   const body = form({ auth: isEmail(id) ? id : localPhone(id), password, phone_code: phone_code || PHONE_CODE, ...DEVICE });
   const res = await api.post(`/client/login?guest_token=${encodeURIComponent(guestToken())}`, body);
-  return sessionFrom(res, isEmail(id) ? { email: id } : { phone: localPhone(id) });
+  return withProfile(sessionFrom(res, isEmail(id) ? { email: id } : { phone: localPhone(id) }));
 }
 
 export async function loginWithOtp() {
@@ -74,7 +88,7 @@ export async function verifyOtp({ phone, otp }) {
     form({ auth: localPhone(phone), code: otp, phone_code: PHONE_CODE, ...DEVICE }),
     CLIENT,
   );
-  return sessionFrom(res, { phone: localPhone(phone) });
+  return withProfile(sessionFrom(res, { phone: localPhone(phone) }));
 }
 
 /** Registration typed a wrong mobile: `POST /client/change-phone-before-verify` moves the unverified account to the new number (the registration data stays). */

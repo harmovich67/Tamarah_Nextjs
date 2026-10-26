@@ -10,6 +10,7 @@ import { useCart, useCartActions } from '@/hooks/useCart';
 import { showToast } from '@/store/toastStore';
 import { asset } from '@/lib/asset';
 import { ErrorState, LoadingState } from '@/components/ui/States';
+import { atStockLimit, limitMessage, StockNote } from '@/components/cart/StockNote';
 
 /** Shopping cart (resources/views/storefront/cart.php). All mutations go through useCartActions(). */
 export default function CartPage({ standardFee = DEFAULT_STANDARD_SHIPPING_FEE }) {
@@ -104,14 +105,15 @@ export default function CartPage({ standardFee = DEFAULT_STANDARD_SHIPPING_FEE }
                     </span>
                     <div className="product-price"><span>{item.unit_price_formatted}</span></div>
                     <div className="quantity-stepper" role="group" aria-label={tr('الكمية', 'Quantity')}>
-                      <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: item.key, quantity: item.quantity - 1 })} aria-label={tr('تقليل الكمية', 'Decrease')}>
+                      <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: item.key, quantity: item.quantity - 1, previous: item.quantity })} aria-label={tr('تقليل الكمية', 'Decrease')}>
                         <Icon name="minus" size={16} />
                       </button>
                       <output>{item.quantity}</output>
-                      <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: item.key, quantity: item.quantity + 1 })} aria-label={tr('زيادة الكمية', 'Increase')}>
+                      <button type="button" className={`button button--icon${atStockLimit(item) ? ' is-at-limit' : ''}`} onClick={() => (atStockLimit(item) ? showToast(limitMessage(item, tr), 'info') : actions.update.mutate({ key: item.key, quantity: item.quantity + 1, previous: item.quantity }))} disabled={actions.update.isPending} aria-label={tr('زيادة الكمية', 'Increase')}>
                         <Icon name="plus" size={16} />
                       </button>
                     </div>
+                    <StockNote item={item} tr={tr} onFit={() => actions.fit.mutate({ key: item.key })} fitting={actions.fit.isPending} />
                   </div>
                   <button type="button" className="button button--icon remove-item" onClick={() => actions.remove.mutate({ key: item.key })} title={tr('حذف من السلة', 'Remove from cart')} aria-label={`${tr('حذف: ', 'Remove: ')}${item.product_name}`}>
                     <Icon name="trash-2" size={18} />
@@ -164,10 +166,19 @@ export default function CartPage({ standardFee = DEFAULT_STANDARD_SHIPPING_FEE }
               <strong>{numberFormat(Number(cart.total) + (free ? 0 : standardFee), 2)} {currency}</strong>
             </div>
 
-            <Link href="/checkout" className="button button--primary commerce-primary-action">
-              {tr('متابعة الشحن والدفع', 'Proceed to checkout')}
-              <Icon name="arrow-left" size={18} className="directional-arrow" />
-            </Link>
+            {cart.items.some((i) => i.out_of_stock) ? (
+              <>
+                <p className="stock-note stock-note--error" role="alert">{tr('بعض المنتجات غير متوفرة بالكمية المطلوبة. عدّلها لإتمام الطلب.', 'Some items are not available in the quantity you chose. Adjust them to check out.')}</p>
+                <button type="button" className="button button--primary commerce-primary-action" disabled>
+                  {tr('متابعة الشحن والدفع', 'Proceed to checkout')}
+                </button>
+              </>
+            ) : (
+              <Link href="/checkout" className="button button--primary commerce-primary-action">
+                {tr('متابعة الشحن والدفع', 'Proceed to checkout')}
+                <Icon name="arrow-left" size={18} className="directional-arrow" />
+              </Link>
+            )}
             <p className="commerce-security-note">{tr('دفع مشفر ١٠٠٪ ومتوافق مع البنك المركزي السعودي', '100% encrypted checkout, SAMA compliant')}</p>
           </aside>
         </div>

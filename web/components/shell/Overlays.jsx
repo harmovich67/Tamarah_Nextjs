@@ -8,6 +8,8 @@ import { useLocale } from '@/components/LocaleProvider';
 import { useUiStore } from '@/store/uiStore';
 import { useCart, useCartActions } from '@/hooks/useCart';
 import { asset, FALLBACK_IMAGE } from '@/lib/asset';
+import { atStockLimit, limitMessage, StockNote } from '@/components/cart/StockNote';
+import { showToast } from '@/store/toastStore';
 import { SiteNav } from './Header';
 
 /** Menu drawer, cart drawer and search dialog (one open at a time, Escape / overlay click closes). */
@@ -58,6 +60,7 @@ function CartDrawer({ open, dir }) {
   const actions = useCartActions();
   const items = cart?.items || [];
   const count = cart?.count || 0;
+  const hasStockIssue = items.some((it) => it.out_of_stock);
 
   useEffect(() => {
     if (open) refetch();
@@ -104,14 +107,15 @@ function CartDrawer({ open, dir }) {
                     <span>{it.unit_price_formatted}</span>
                   </div>
                   <div className="quantity-stepper" role="group">
-                    <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: it.key, quantity: it.quantity - 1 })} aria-label={tr('تقليل الكمية', 'Decrease quantity')}>
+                    <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: it.key, quantity: it.quantity - 1, previous: it.quantity })} aria-label={tr('تقليل الكمية', 'Decrease quantity')}>
                       <Icon name="minus" size={16} />
                     </button>
                     <output>{it.quantity}</output>
-                    <button type="button" className="button button--icon" onClick={() => actions.update.mutate({ key: it.key, quantity: it.quantity + 1 })} aria-label={tr('زيادة الكمية', 'Increase quantity')}>
+                    <button type="button" className={`button button--icon${atStockLimit(it) ? ' is-at-limit' : ''}`} onClick={() => (atStockLimit(it) ? showToast(limitMessage(it, tr), 'info') : actions.update.mutate({ key: it.key, quantity: it.quantity + 1, previous: it.quantity }))} disabled={actions.update.isPending} aria-label={tr('زيادة الكمية', 'Increase quantity')}>
                       <Icon name="plus" size={16} />
                     </button>
                   </div>
+                  <StockNote item={it} tr={tr} onFit={() => actions.fit.mutate({ key: it.key })} fitting={actions.fit.isPending} />
                 </div>
                 <button type="button" className="button button--icon cart-item-remove" onClick={() => actions.remove.mutate({ key: it.key })} aria-label={tr('حذف المنتج', 'Remove item')} title={tr('حذف المنتج', 'Remove item')}>
                   <Icon name="trash-2" size={18} />
@@ -134,7 +138,14 @@ function CartDrawer({ open, dir }) {
           </div>
         )}
         <p className="muted">{tr('يُحدَّد الشحن عند إتمام الطلب وفق العنوان وطريقة التوصيل.', 'Shipping is calculated at checkout based on your address and delivery method.')}</p>
-        <Link className="button button--primary" href="/checkout">{tr('إتمام الطلب', 'Checkout')}</Link>
+        {hasStockIssue ? (
+          <>
+            <p className="stock-note stock-note--error" role="alert">{tr('بعض المنتجات غير متوفرة بالكمية المطلوبة. عدّلها لإتمام الطلب.', 'Some items are not available in the quantity you chose. Adjust them to check out.')}</p>
+            <button type="button" className="button button--primary" disabled>{tr('إتمام الطلب', 'Checkout')}</button>
+          </>
+        ) : (
+          <Link className="button button--primary" href="/checkout">{tr('إتمام الطلب', 'Checkout')}</Link>
+        )}
         <Link className="button button--outline" href="/cart">{tr('عرض السلة كاملة', 'View full cart')}</Link>
       </div>
     </aside>

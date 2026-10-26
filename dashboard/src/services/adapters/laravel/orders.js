@@ -1,9 +1,10 @@
 import { ApiError, ERROR_CODES } from '@tamrna/shared/api';
 import { allowedOrderStatuses } from '@tamrna/shared/constants';
+import { readPickup } from '@tamrna/shared/utils';
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { unwrap } from './helpers';
-import { fetchAll, listFilters, mediaList, tx, txPair } from './tamrna';
+import { fetchAll, fetchPage, listFilters, mediaList, tx, txPair } from './tamrna';
 
 /**
  * Orders + dashboard KPIs of the Tamrna backend (Postman collection `tomorona`: `GET /admin/orders`, `GET /admin/orders/{id}`,
@@ -125,6 +126,8 @@ function extractDeliveryType(o) {
 }
 
 function isBranchOrder(o, addressLine = '') {
+  // The storefront writes the pickup into the notes (shared/utils/pickup.js): the backend drops delivery_type / branch_id.
+  if (readPickup(o.notes ?? o.note).branchId) return true;
   const rawDelivery = extractDeliveryType(o);
 
   // If explicitly home delivery, it's definitely NOT branch pickup
@@ -193,7 +196,8 @@ function toOrder(input) {
   const address = addressOf(o);
   const rawDelivery = extractDeliveryType(o);
   const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
-  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+  const marker = readPickup(o.notes ?? o.note);
+  const branchId = marker.branchId ?? pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
   const isBranch = isBranchOrder(o, address.line);
 
   const branchName = branch && typeof branch === 'object' ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
@@ -208,15 +212,15 @@ function toOrder(input) {
     customer_name: customer.name,
     customer_phone: customer.phone,
     customer_email: customer.email,
-    city: branchCity || address.city || (isBranch ? 'الرياض' : ''),
-    shipping_address: isBranch ? (branchAddress || 'استلام مباشر من الفرع المعتمد') : address.line,
+    city: branchCity || address.city,
+    shipping_address: isBranch ? branchAddress : address.line,
     shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'delivery'),
     delivery_type: isBranch ? 'branch' : 'delivery',
     is_branch: isBranch,
-    branch_id: branchId || branch?.id || (isBranch ? 1 : null),
-    branch_name: branchName || (isBranch ? 'فرع تمرنا المعتمد (الرياض)' : ''),
-    branch_address: branchAddress || (isBranch ? 'طريق الملك فهد - الرياض' : ''),
-    branch_city: branchCity || (isBranch ? 'الرياض' : ''),
+    branch_id: branchId || branch?.id || null,
+    branch_name: branchName,
+    branch_address: branchAddress,
+    branch_city: branchCity,
     payment_method: String(pick(o, ['payment_method', 'payment.method', 'payment_type'], 'cod')),
     payment_status: String(pick(o, ['payment_status'], 'pending')).toLowerCase(),
     shipping_status: shippingStatusOf(o),
@@ -224,7 +228,7 @@ function toOrder(input) {
     shipping_fee: isBranch ? 0 : num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount_amount', 'discount', 'coupon_discount']),
     total: num(o, ['total', 'grand_total', 'total_price', 'amount']),
-    notes: pick(o, ['notes', 'note'], ''),
+    notes: marker.notes,
     tracking_number: pick(o, ['tracking_number'], ''),
     waybill_id: pick(o, ['waybill_id'], ''),
     items_count: items.length || num(o, ['items_count']),
@@ -233,16 +237,60 @@ function toOrder(input) {
   };
 }
 
+/**
+ * The pickup branches of the store (`GET /general/branches`, public: name, city, address), kept for a minute. The order only
+ * carries the branch id (or the id inside the notes marker), so the name / city / address shown are the real ones.
+ */
+let branchCache = { at: 0, byId: new Map() };
+async function branchesById() {
+  if (Date.now() - branchCache.at < 60_000 && branchCache.byId.size) return branchCache.byId;
+  try {
+    const rows = unwrap(await api.get('/general/branches'));
+    branchCache = { at: Date.now(), byId: new Map((Array.isArray(rows) ? rows : rows?.data ?? []).map((b) => [String(b.id), b])) };
+  } catch {
+    /* without the list the order keeps what it has */
+  }
+  return branchCache.byId;
+}
+
+async function withBranch(order) {
+  if (!order.is_branch || !order.branch_id) return order;
+  const b = (await branchesById()).get(String(order.branch_id));
+  if (!b) return order;
+  const city = text(b.city).trim();
+  return { ...order, branch_name: b.name || order.branch_name, branch_address: b.address || order.branch_address, branch_city: city || order.branch_city, city: city || order.city, shipping_address: b.address || order.shipping_address };
+}
+
+/**
+ * `GET /admin/orders/{id}` answers without the delivery address (and without lines), the list rows carry the address: take it from
+ * the list row of the same order. The newest orders come first, so the first page nearly always has it.
+ */
+async function listRowOf(id) {
+  try {
+    for (let page = 1; page <= 10; page += 1) {
+      const { rows, lastPage } = await fetchPage(e.orders.list, { page, per_page: 100 });
+      const hit = rows.find((r) => String(r.id) === String(id));
+      if (hit) return hit;
+      if (page >= lastPage) break;
+    }
+  } catch {
+    /* the detail alone is shown */
+  }
+  return null;
+}
+
 /** @param {{ status?: string, payment_status?: 'paid' | 'pending', delivery_type?: 'branch' | 'delivery' | 'private' }} [opts] sent as filters[...] */
 export async function listOrders(opts = {}) {
   const rows = await fetchAll(e.orders.list, listFilters({ filters: opts }));
-  return rows.map(toOrder).sort((a, b) => b.id - a.id);
+  return Promise.all(rows.map((r) => withBranch(toOrder(r)))).then((list) => list.sort((a, b) => b.id - a.id));
 }
 
 export async function getOrder(id) {
   const raw = unwrap(await api.get(e.orders.item(id)));
-  const src = raw?.order && typeof raw.order === 'object' ? { ...raw.order, ...raw } : raw;
-  const order = toOrder(src);
+  const detail = raw?.order && typeof raw.order === 'object' ? { ...raw.order, ...raw } : raw;
+  const row = detail?.address ? null : await listRowOf(detail?.id ?? id);
+  const src = row ? { ...row, ...detail, address: row.address } : detail;
+  const order = await withBranch(toOrder(src));
   const items = order._items?.length ? order._items : itemsOf(src);
   const { _items: _, ...rest } = order;
   return { order: { ...rest, subtotal: rest.subtotal || items.reduce((s, i) => s + i.subtotal, 0) }, items };

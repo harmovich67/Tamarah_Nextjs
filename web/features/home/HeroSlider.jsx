@@ -102,7 +102,7 @@ export default function HeroSlider({ banners }) {
           return (
             <div className={cls} key={banner.id}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="home-hero-image" src={asset(banner.image)} alt={title} loading={index === 0 ? undefined : 'lazy'} />
+              <img className="home-hero-image" src={asset(banner.image || 'assets/images/home/hero.webp')} alt={title} loading={index === 0 ? undefined : 'lazy'} />
               <div className="home-hero-shade" />
               <div className="container hero-content">
                 <div className="hero-copy">

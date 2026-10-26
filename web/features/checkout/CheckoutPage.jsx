@@ -16,7 +16,8 @@ import { ErrorState, LoadingState } from '@/components/ui/States';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { cartKey } from '@/hooks/useCart';
-import { checkoutService } from '@/services';
+import { authService, checkoutService } from '@/services';
+import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/store/toastStore';
 import { asset } from '@/lib/asset';
 
@@ -41,7 +42,13 @@ function CheckoutForm() {
   const { data: cart, isLoading: cartLoading } = useCart();
   const { data: checkout, isLoading, isError, refetch } = useQuery({ queryKey: ['checkout'], queryFn: () => checkoutService.getCheckoutData() });
 
-  const nameParts = String(user?.name || '').trim().split(/\s+/);
+  // A session opened before the name was read at sign-in has none: ask the profile (signed-in customers only; guests type theirs).
+  const { data: profile } = useQuery({ queryKey: ['checkout-profile'], queryFn: () => authService.currentUser(), enabled: hydrated && !!user, staleTime: 60_000 });
+  const setUser = useAuthStore((s) => s.setUser);
+  const person = { ...user, ...(profile || {}) };
+  const nameParts = String(person.name || '').trim().split(/\s+/).filter(Boolean);
+  const firstName = person.first_name || nameParts[0] || '';
+  const lastName = person.last_name || nameParts.slice(1).join(' ');
   const form = useForm({
     resolver: zodResolver(checkoutSchema(locale)),
     defaultValues: {
@@ -66,12 +73,17 @@ function CheckoutForm() {
   // Prefill from the signed-in customer (once the session is known).
   useEffect(() => {
     if (!hydrated || !user) return;
-    if (!getValues('first_name')) setValue('first_name', nameParts[0] || '');
-    if (!getValues('last_name')) setValue('last_name', nameParts.slice(1).join(' '));
-    if (!getValues('phone')) setValue('phone', user.phone || '');
-    if (!getValues('email')) setValue('email', user.email || '');
+    if (!getValues('first_name')) setValue('first_name', firstName);
+    if (!getValues('last_name')) setValue('last_name', lastName);
+    if (!getValues('phone')) setValue('phone', person.phone || '');
+    if (!getValues('email')) setValue('email', person.email || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, user]);
+  }, [hydrated, user, profile]);
+
+  // Keep the name for the rest of the session (header, account pages) once the profile has it.
+  useEffect(() => {
+    if (profile?.name && user && !user.name) setUser({ ...user, ...profile });
+  }, [profile, user, setUser]);
 
   const methods = useMemo(() => (checkout ? paymentMethods(checkout.payment, tr, currency) : []), [checkout, tr, currency]);
   useEffect(() => {
@@ -327,7 +339,13 @@ function CheckoutForm() {
               <strong><span id="summaryGrandTotal">{numberFormat(total, 2)}</span> {currency}</strong>
             </div>
 
-            <button type="submit" className="button button--primary commerce-primary-action" disabled={isSubmitting}>
+            {cart.items.some((i) => i.out_of_stock) ? (
+              <p className="stock-note stock-note--error" role="alert">
+                {tr('بعض المنتجات غير متوفرة بالكمية المطلوبة.', 'Some items are not available in the quantity you chose.')}{' '}
+                <Link href="/cart" className="stock-note__action">{tr('عدّل السلة', 'Edit your cart')}</Link>
+              </p>
+            ) : null}
+            <button type="submit" className="button button--primary commerce-primary-action" disabled={isSubmitting || cart.items.some((i) => i.out_of_stock)}>
               {isSubmitting ? tr('جارٍ تأكيد الطلب…', 'Placing your order…') : tr('تأكيد الطلب الآن', 'Place Order Now')}
               <Icon name="arrow-left" size={18} className="directional-arrow" />
             </button>

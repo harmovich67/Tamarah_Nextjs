@@ -65,7 +65,10 @@ export default function ProductCard({ product: p, extraClass = '', rank = 0 }) {
           {isOutOfStock ? (
             <span className="badge badge--out_of_stock">{tr('نفد من المخزون', 'Out of Stock')}</span>
           ) : (
-            isPreorder && <span className="badge badge--preorder">{tr('حجز مسبق', 'Pre-Order')}</span>
+            <>
+              {isPreorder && <span className="badge badge--preorder">{tr('حجز مسبق', 'Pre-Order')}</span>}
+              {Number(p.stock_quantity) === 1 && <span className="badge badge--preorder">{tr('آخر قطعة', 'Last piece')}</span>}
+            </>
           )}
           {discount > 0 ? (
             <span className="badge">{isRtl ? `خصم ${discount}%` : `${discount}% OFF`}</span>

@@ -1,8 +1,8 @@
-import { formatMoney2 } from '@tamrna/shared/utils';
+import { formatMoney2, pickupNotes } from '@tamrna/shared/utils';
 import { getClientLocale } from '@/lib/locale-client';
 import { getStoredUser } from '@/lib/session';
 import { createAddress, findSavedAddress, getOrder as getAccountOrder, loadCities, savedAddresses, zonesOf } from './account';
-import { api, form, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder, unsupported, unwrap } from './http';
+import { api, form, localPhone, needsLogin, num, PHONE_CODE, rememberPickup, rowsOf, t, toOrder, unsupported, unwrap } from './http';
 /**
  * Checkout against the Tamrna backend: `POST /client/orders/checkout { address_id, gift_card_code, delivery_type }`
  * with `delivery_type` = `delivery` (home) | `branch` (pickup) | `private`. The backend takes the cart of the signed-in
@@ -78,6 +78,8 @@ export async function placeOrder(input) {
 
   const branch = input.shipping_type === 'branch_pickup';
   const body = { delivery_type: branch ? 'branch' : 'delivery', gift_card_code: '' };
+  let pickedBranch = null;
+  if (!branch && String(input.notes || '').trim()) body.notes = String(input.notes).trim();
   const savedRows = await savedAddresses().catch(() => []);
   let addressId;
   let isDefault = false;
@@ -86,6 +88,10 @@ export async function placeOrder(input) {
     // Pickup orders need the branch id and (checked on the live server) an address too: the customer's default one.
     if (!/^\d+$/.test(String(input.pickup_branch || ''))) throw unsupported(t('اختر فرع الاستلام.', 'Choose the pickup branch.'));
     body.branch_id = input.pickup_branch;
+    pickedBranch = (await pickupBranches().catch(() => [])).find((b) => b.id === String(input.pickup_branch)) ?? { id: String(input.pickup_branch), name: '', city: '', address: '' };
+    // Checked on the live server: the backend ignores delivery_type / branch_id of a customer order (it is saved as a home
+    // delivery) but keeps the notes, so the pickup travels there for the dashboard to read (shared/utils/pickup.js).
+    body.notes = pickupNotes({ branchId: input.pickup_branch, branchName: pickedBranch.name, notes: input.notes });
     const home = savedRows.find((a) => a.is_default) || savedRows[0];
     if (!home) throw unsupported(t('أضف عنواناً في حسابك أولاً، فهو مطلوب حتى عند الاستلام من الفرع.', 'Add an address to your account first; it is required for branch pickup too.'));
     addressId = home.id;
@@ -116,12 +122,9 @@ export async function placeOrder(input) {
     throw error;
   }
   const raw = res?.order ?? res;
+  // The branch is remembered before the order is mapped, so the confirmation page already reads it as a pickup.
+  if (pickedBranch && raw && typeof raw === 'object') rememberPickup(String(raw.order_number ?? raw.id ?? ''), pickedBranch);
   const { order, items } = toOrder(raw && typeof raw === 'object' ? raw : {});
-  if (branch) {
-    order.shipping_type = 'branch_pickup';
-    order.delivery_type = 'branch';
-    order.branch_id = input.pickup_branch || order.branch_id;
-  }
   const number = order.order_number || String(raw?.id ?? '');
   rememberPlacedOrder(order, items);
   return { order: { ...order, items }, next: { type: 'order', url: `/order/${encodeURIComponent(number)}` } };

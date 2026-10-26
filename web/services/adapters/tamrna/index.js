@@ -3,6 +3,7 @@ import { DEFAULT_FREE_SHIPPING_THRESHOLD } from '@tamrna/shared/constants';
 import { effectivePrice, formatMoney2, randomToken, slugify } from '@tamrna/shared/utils';
 import { apiClient as api } from '@/lib/apiClient';
 import { getClientLocale } from '@/lib/locale-client';
+import { rememberStock, stockHint } from '@/lib/stockHints';
 
 /**
  * Adapter for the real Tamrna backend (Postman collection `tomorona`, `/client/*`). It returns exactly the shapes the
@@ -125,7 +126,7 @@ function fromListRow(ar, en) {
     weight: weightLabel(ar.weight, ar.weight_unit),
     is_fragile: false,
     sku: '',
-    // The backend does not save stock yet: a purchasable product counts as in stock.
+    // Unknown until a pack reports a stock (the public answer gives 0 for products that keep it as grams on the product): such a product counts as in stock, and the cart check tells the truth on the first add.
     stock_quantity: ar.is_purchasable === false || ar.availability === 'unavailable' ? 0 : 99,
   };
 }
@@ -141,7 +142,9 @@ function mapVariant(v, productStock, tracked = false) {
   const base = Number(v.base_price) || 0;
   const effective = round2(v.effective_price ?? base);
   const discounted = effective > 0 && effective < base;
-  const stock = tracked ? Number(v.stock) || 0 : productStock;
+  // A limit learned from the cart (see "stock guard" below) is the real number; otherwise the public answer's 0 means "unknown".
+  const learned = stockHint(v.id);
+  const stock = learned !== null ? learned : tracked ? Number(v.stock) || 0 : productStock;
   return {
     id: v.id,
     size_name: weightLabel(v.weight, v.weight_unit, 'ar'),
@@ -539,13 +542,19 @@ function guestToken() {
  * the first gallery picture) and, when the cart answers 0.00, the pack price.
  */
 async function lineDetail(productId, variantId) {
-  if (!productId) return { image: '', price: 0 };
+  if (!productId) return { image: '', price: 0, stock: null };
   try {
     const product = (await productDetail(productId))?.product || {};
     const variant = (product.variants || []).find((v) => String(v.id) === String(variantId));
-    return { image: (product.gallery || []).map(imageOf).find(Boolean) || imageOf(product.image), price: variant ? round2(variant.effective_price ?? variant.base_price ?? 0) : 0 };
+    // The pack stock is real once the product keeps stock per pack (some pack reports more than 0); otherwise it is unknown.
+    const tracked = (product.variants || []).some((v) => Number(v.stock) > 0);
+    return {
+      image: (product.gallery || []).map(imageOf).find(Boolean) || imageOf(product.image),
+      price: variant ? round2(variant.effective_price ?? variant.base_price ?? 0) : 0,
+      stock: tracked && variant ? Number(variant.stock) || 0 : null,
+    };
   } catch {
-    return { image: '', price: 0 };
+    return { image: '', price: 0, stock: null };
   }
 }
 
@@ -571,7 +580,11 @@ async function toSummary(data) {
         unit_price: unit,
         unit_price_formatted: formatMoney2(unit, locale),
         quantity,
-        max_stock: 99,
+        // `is_out_of_stock` is the backend's own check of this line's quantity against the real stock (checked on the live
+        // server: 6 packs in stock -> quantity 6 is 0, quantity 7 is 1). `stock_limit` is the most it will sell once known.
+        out_of_stock: isShort(it),
+        stock_limit: stockHint(v.id) ?? detail.stock,
+        max_stock: stockHint(v.id) ?? detail.stock ?? 99,
         is_preorder: false,
         is_fragile: false,
         subtotal: unit * quantity,
@@ -610,6 +623,54 @@ export async function getCart() {
 /** A mutation answers with the cart; fall back to reading it when the answer has another shape. */
 const cartFrom = async (res) => (Array.isArray(unwrap(res)?.items) ? toSummary(unwrap(res)) : getCart());
 
+// ------------------------------------------------------------------------------------------------ stock guard
+/**
+ * The public product answer carries no stock, and the cart accepts any quantity (up to 100). What the backend does tell is, per cart
+ * line, `is_out_of_stock`: 1 when that line's quantity is more than it can sell. So every add / increase is checked on the answer
+ * itself: when the line comes back short, the quantity is brought back to what is sellable (found by halving between a quantity
+ * that is fine and the one that is not), the customer is told, and the limit is remembered for ten minutes so the product page,
+ * the cards and the cart show "last piece" / "out of stock" without asking again.
+ */
+const isShort = (line) => !!line && (line.is_out_of_stock === true || Number(line.is_out_of_stock) > 0);
+const lineOf = (res, key) => (unwrap(res)?.items || []).find((i) => String(i.id) === String(key));
+const setLineQuantity = (key, quantity) => {
+  const body = new FormData();
+  body.append('_method', 'put');
+  body.append('quantity', String(quantity));
+  return api.post(`/client/cart/items/${key}?guest_token=${encodeURIComponent(guestToken())}`, body);
+};
+
+/**
+ * Brings a short line back to what the backend can sell and returns that number. `fine` is a quantity known to be sellable
+ * (0 when unknown), `tooMany` one that is not. The line ends at the returned quantity (removed when it is 0).
+ */
+async function settleLine(key, variantId, { fine = 0, tooMany }) {
+  let ok = 0;
+  let at = tooMany; // the quantity the line has on the server right now
+  if (fine > 0) {
+    at = fine;
+    if (!isShort(lineOf(await setLineQuantity(key, fine), key))) ok = fine;
+  }
+  let bad = ok === fine ? tooMany : fine;
+  while (bad - ok > 1) {
+    const mid = Math.floor((ok + bad) / 2);
+    at = mid;
+    if (isShort(lineOf(await setLineQuantity(key, mid), key))) bad = mid;
+    else ok = mid;
+  }
+  if (ok === 0) await api.delete(`/client/cart/items/${key}?guest_token=${encodeURIComponent(guestToken())}`).catch(() => null);
+  else if (at !== ok) await setLineQuantity(key, ok);
+  rememberStock(variantId, ok);
+  return ok;
+}
+
+const stockWords = (name, limit, inCart) => {
+  const who = name ? `${name}: ` : '';
+  if (limit <= 0) return `${who}${t('نفد من المخزون', 'out of stock')}`;
+  if (limit === 1) return inCart ? `${who}${t('هذه آخر قطعة متاحة وهي في سلتك بالفعل', 'this is the last piece and it is already in your cart')}` : `${who}${t('هذه آخر قطعة متاحة', 'this is the last piece')}`;
+  return inCart ? `${who}${t(`وصلت للحد الأقصى المتاح (${limit}) وهو في سلتك بالفعل`, `you have the most available (${limit}) in your cart`)}` : `${who}${t(`المتاح ${limit} فقط`, `only ${limit} available`)}`;
+};
+
 export async function addItem({ productId, variantId, quantity = 1 }) {
   let variant = variantId;
   if (!variant) {
@@ -624,16 +685,42 @@ export async function addItem({ productId, variantId, quantity = 1 }) {
   body.append('quantity', String(Math.max(1, Number(quantity) || 1)));
   body.append('guest_token', guestToken());
   const res = await api.post('/client/cart/add', body);
+  const wanted = Math.max(1, Number(quantity) || 1);
+  const line = (unwrap(res)?.items || []).find((i) => String(i.variant?.id) === String(variant));
+  if (isShort(line)) {
+    const before = Math.max(0, Number(line.quantity) - wanted); // what the cart already held of this pack
+    const limit = await settleLine(line.id, variant, { fine: before, tooMany: Number(line.quantity) });
+    const added = limit - before;
+    const name = line.product?.name || '';
+    if (added <= 0) {
+      // Nothing more can be added: the cart is back as it was and the customer is told why.
+      throw unsupported(stockWords(name, limit, before > 0));
+    }
+    return { warning: `${stockWords(name, limit, false)} — ${t(`أُضيف ${added} إلى سلتك`, `${added} added to your cart`)}`, cart: await getCart() };
+  }
   return { message: res?.message || t('تمت إضافة التمر إلى سلة التسوق بنجاح', 'Added to your cart'), cart: await cartFrom(res) };
 }
 
-export async function updateItem({ key, quantity }) {
+/** @param {{ key: string, quantity: number, previous?: number }} input `previous`: the quantity the line had (a decrease is never refused). */
+export async function updateItem({ key, quantity, previous }) {
   if (!(Number(quantity) > 0)) return removeItem({ key });
-  const body = new FormData();
-  body.append('_method', 'put');
-  body.append('quantity', String(Number(quantity)));
   // Item routes take the guest token in the query string.
-  return { cart: await cartFrom(await api.post(`/client/cart/items/${key}?guest_token=${encodeURIComponent(guestToken())}`, body)) };
+  const res = await setLineQuantity(key, Number(quantity));
+  const line = lineOf(res, key);
+  if (isShort(line) && !(previous > 0 && Number(quantity) < previous)) {
+    const limit = await settleLine(key, line.variant?.id, { fine: Number(previous) > 0 ? Number(previous) : 0, tooMany: Number(quantity) });
+    return { warning: stockWords(line.product?.name || '', limit, true), cart: await getCart() };
+  }
+  return { cart: await cartFrom(res) };
+}
+
+/** "Set to what is available": for a line whose quantity is more than the stock (the cart shows it with `out_of_stock`). */
+export async function fitItem({ key }) {
+  const res = await getData('/client/cart', guestQuery());
+  const line = (res?.items || []).find((i) => String(i.id) === String(key));
+  if (!isShort(line)) return { cart: await getCart() };
+  const limit = await settleLine(key, line.variant?.id, { fine: 0, tooMany: Number(line.quantity) });
+  return { warning: stockWords(line.product?.name || '', limit, false), cart: await getCart() };
 }
 
 export async function removeItem({ key }) {

@@ -26,6 +26,7 @@ const cart = partial
       updateItem: tamrna.updateItem,
       removeItem: tamrna.removeItem,
       clearCart: tamrna.clearCart,
+      fitItem: tamrna.fitItem,
       applyCoupon: tamrna.applyCoupon,
       removeCoupon: tamrna.removeCoupon,
       addGiftCard: tamrna.addGiftCard,

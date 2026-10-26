@@ -268,7 +268,7 @@ export default function OrderDetailPage() {
                   <span>
                     {isBranch
                       ? tr('طريقة الاستلام (استلام من الفرع):', 'Fulfillment (Branch pickup):')
-                      : tr(`رسوم الشحن والتوصيل (${order.city || 'الرياض'}):`, `Shipping & delivery (${order.city || 'Riyadh'}):`)}
+                      : tr(`رسوم الشحن والتوصيل${order.city ? ` (${order.city})` : ''}:`, `Shipping & delivery${order.city ? ` (${order.city})` : ''}:`)}
                   </span>
                 </span>
                 <span className="text-base font-black text-gold-700">
@@ -341,7 +341,7 @@ export default function OrderDetailPage() {
                       <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-1.5">
                         <Icon name="map-pin" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>
-                          {order.branch_address || (order.city ? `${tr('الفرع المعتمد بمدينة', 'Boutique in')} ${order.city}` : tr('فرع الرياض الرئيسي (طريق الملك فهد)', 'Main Riyadh Boutique (King Fahd Rd)'))}
+                          {[order.branch_city || order.city, order.branch_address].filter(Boolean).join(' - ') || tr('بيانات الفرع غير متوفرة', 'Branch details unavailable')}
                         </span>
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1 font-normal">
@@ -357,7 +357,7 @@ export default function OrderDetailPage() {
                           ({tr('توصيل مبرد للمنزل', 'Chilled delivery')})
                         </span>
                       </p>
-                      <p className="text-xs text-slate-600">{order.shipping_address || tr('العنوان الوطني المسجل', 'Registered national address')}</p>
+                      <p className="text-xs text-slate-600">{order.shipping_address || tr('العنوان غير متوفر', 'Address unavailable')}</p>
                     </>
                   )}
                 </div>

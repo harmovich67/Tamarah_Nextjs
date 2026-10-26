@@ -70,3 +70,39 @@
 .input.select.auth-code-select:focus {
   border-color: #17513b;
 }
+
+/* Cart stock messages ("last piece", "not available in this quantity"). */
+.stock-note {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border: 1px solid #f0d9a0;
+  border-radius: 10px;
+  background: #fff6df;
+  color: #7a5200;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.stock-note--error {
+  border-color: #f2b9b4;
+  background: #fdeceb;
+  color: #a1281d;
+}
+.stock-note__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.stock-note__action:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.button.is-at-limit {
+  opacity: 0.45;
+}

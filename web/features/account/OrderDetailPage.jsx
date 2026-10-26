@@ -11,7 +11,7 @@ import { Flash } from '@/components/ui/FormField';
 import { ErrorState, LoadingState } from '@/components/ui/States';
 import { accountService } from '@/services';
 import { showToast } from '@/store/toastStore';
-import { asset } from '@/lib/asset';
+import { asset, FALLBACK_IMAGE } from '@/lib/asset';
 import { config } from '@/lib/config';
 import AccountShell from './AccountShell';
 
@@ -147,7 +147,7 @@ function Body({ data: d, cancel: c }) {
               <li key={item.id}>
                 {item.product_image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={asset(item.product_image)} alt={item.product_name} />
+                  <img src={asset(item.product_image || FALLBACK_IMAGE)} alt={item.product_name} />
                 ) : (
                   <span style={{ display: 'grid', placeItems: 'center', width: 64, height: 72, borderRadius: 8, background: '#eee5d8', color: '#174a37' }}><Icon name="package" size={26} /></span>
                 )}

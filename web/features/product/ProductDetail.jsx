@@ -8,6 +8,7 @@ import { useLocale } from '@/components/LocaleProvider';
 import ProductCard from '@/components/product/ProductCard';
 import StarRating, { ratingLabel } from '@/components/product/StarRating';
 import { useCartActions } from '@/hooks/useCart';
+import { useStockHint } from '@/hooks/useStockHint';
 import { useWishlistIds, useWishlistToggle } from '@/hooks/useWishlist';
 import { asset } from '@/lib/asset';
 import { showToast } from '@/store/toastStore';
@@ -76,15 +77,21 @@ export default function ProductDetail({ product, variants, related, whatsapp, sh
   const inWishlist = wishlist.some((id) => Number(id) === Number(product.id));
   const shareText = `${name} — ${tr('تمرنا', 'Tamrna')}`;
   const sep = isRtl ? '‹' : '›';
-  const stockState = isOutOfStock ? 'stock-out' : stockQty <= 10 ? 'stock-low' : 'stock-ok';
-  const stockLabel = isOutOfStock
+  // The pack the customer picked decides (its stock is the limit learned from the cart, see services/adapters/tamrna).
+  const learned = useStockHint(selected?.id);
+  const shownStock = learned ?? (selected ? Number(selected.stock_quantity) : stockQty);
+  const packOut = isOutOfStock || shownStock <= 0;
+  const stockState = packOut ? 'stock-out' : shownStock <= 10 ? 'stock-low' : 'stock-ok';
+  const stockLabel = packOut
     ? tr('غير متوفر حالياً', 'Currently unavailable')
-    : stockQty <= 10
-      ? tr(`كمية محدودة (${stockQty})`, `Limited stock (${stockQty})`)
-      : tr('متوفر في المخزون', 'In stock');
+    : shownStock === 1
+      ? tr('آخر قطعة متاحة', 'Last piece available')
+      : shownStock <= 10
+        ? tr(`كمية محدودة (${shownStock})`, `Limited stock (${shownStock})`)
+        : tr('متوفر في المخزون', 'In stock');
   const kg = (text) => (isRtl ? text : String(text).replace(/كجم|كيلو/g, 'kg'));
   const waUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(`${tr('مرحباً متجر تمرنا، أود الاستفسار عن وحجز منتج: ', 'Hello Tumurna, I would like to inquire about: ')}${name}`)}`;
-  const maxQty = Math.max(1, selected ? selected.stock_quantity : stockQty);
+  const maxQty = Math.max(1, learned ?? (selected ? selected.stock_quantity : stockQty));
 
   const copyLink = async () => {
     try {
@@ -267,11 +274,11 @@ export default function ProductDetail({ product, variants, related, whatsapp, sh
                     type="button"
                     id="addToCartBtn"
                     className="button button--primary product-add-button"
-                    disabled={isOutOfStock || add.isPending}
+                    disabled={packOut || add.isPending}
                     onClick={() => add.mutate({ productId: product.id, variantId, quantity: qty })}
                   >
                     <Icon name="shopping-cart" size={20} />
-                    {isOutOfStock ? tr('نفد من المخزون', 'Out of Stock') : isPreorder ? tr('حجز مسبق وإضافة للسلة', 'Pre-order & add to cart') : tr('أضف إلى السلة', 'Add to cart')}
+                    {packOut ? tr('نفد من المخزون', 'Out of Stock') : isPreorder ? tr('حجز مسبق وإضافة للسلة', 'Pre-order & add to cart') : tr('أضف إلى السلة', 'Add to cart')}
                   </button>
                   <div className="product-secondary-actions">
                     <button type="button" className={`button button--outline wishlist-button${inWishlist ? ' is-saved' : ''}`} data-wishlist-id={product.id} aria-pressed={inWishlist} onClick={() => toggleWishlist.mutate(product.id)}>

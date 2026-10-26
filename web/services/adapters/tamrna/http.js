@@ -222,6 +222,30 @@ function isBranchOrder(o, addressLine = '') {
   return false;
 }
 
+/**
+ * The customer checkout saves a branch pickup as a home delivery (shared/utils/pickup.js), and the order list says nothing about
+ * the delivery type. So the branch picked at checkout is kept in this browser, per order number, and put back when the order is read.
+ */
+const PICKUP_KEY = 'tamrna.web.order-pickup';
+const readPickups = () => {
+  try {
+    return typeof window === 'undefined' ? {} : JSON.parse(window.localStorage.getItem(PICKUP_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+/** @param {string} orderNumber @param {{ id: string, name: string, city: string, address: string }} branch */
+export function rememberPickup(orderNumber, branch) {
+  try {
+    const all = readPickups();
+    all[orderNumber] = { id: branch.id, name: branch.name, city: branch.city, address: branch.address };
+    const keep = Object.keys(all).slice(-200); // the newest 200 orders are enough
+    window.localStorage.setItem(PICKUP_KEY, JSON.stringify(Object.fromEntries(keep.map((k) => [k, all[k]]))));
+  } catch {
+    /* private mode: the order then shows as a delivery */
+  }
+}
+
 export function toOrder(input) {
   const o = input?.order && typeof input.order === 'object' ? { ...input.order, ...input } : input || {};
   const items = pick(o, ['items', 'order_items', 'products'], []).map(toOrderItem);
@@ -235,7 +259,7 @@ export function toOrder(input) {
   const branchName = branch && typeof branch === 'object' ? (branch.name || branch.title || '') : pick(o, ['branch_name', 'pickup_branch'], '');
   const branchAddress = branch && typeof branch === 'object' ? (branch.address || '') : pick(o, ['branch_address'], '');
   const branchCity = branch && typeof branch === 'object' ? (branch.city?.name || branch.city || '') : '';
-  const city = branchCity || text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], '')) || (isBranch ? 'الرياض' : '');
+  const city = branchCity || text(pick(addr, ['city', 'city_name'], '') || pick(o, ['city'], ''));
 
   const order = {
     id: o.id,
@@ -244,17 +268,17 @@ export function toOrder(input) {
     customer_name: text(pick(o, ['client.full_name', 'client.name', 'customer_name'], '')),
     customer_phone: String(pick(o, ['client.phone', 'customer_phone'], '')),
     customer_email: pick(o, ['client.email', 'customer_email'], ''),
-    shipping_address: isBranch ? (branchAddress || 'استلام مباشر من الفرع المعتمد') : line,
+    shipping_address: isBranch ? branchAddress : line,
     city,
     governorate: city,
     district: typeof addr === 'object' ? addr.district || '' : '',
     shipping_type: isBranch ? 'branch_pickup' : (rawDelivery || 'home_delivery'),
     delivery_type: isBranch ? 'branch' : 'delivery',
     is_branch: isBranch,
-    branch_id: branchId || branch?.id || (isBranch ? 1 : null),
-    branch_name: branchName || (isBranch ? 'فرع تمرنا المعتمد' : ''),
-    branch_address: branchAddress || (isBranch ? 'طريق الملك فهد' : ''),
-    branch_city: branchCity || (isBranch ? 'الرياض' : ''),
+    branch_id: branchId || branch?.id || null,
+    branch_name: branchName,
+    branch_address: branchAddress,
+    branch_city: branchCity,
     subtotal: num(o, ['total_items_price', 'subtotal', 'sub_total', 'items_total']),
     shipping_fee: isBranch ? 0 : num(o, ['shipping_fee', 'delivery_fee', 'shipping_cost', 'delivery_price']),
     discount: num(o, ['discount', 'discount_amount', 'gift_card_discount']),
@@ -266,5 +290,22 @@ export function toOrder(input) {
     items_count: items.length || num(o, ['items_count']),
     products_snippet: items.map((i) => i.product_name).filter(Boolean).join(' • '),
   };
+  const pickup = readPickups()[order.order_number];
+  if (pickup) {
+    Object.assign(order, {
+      is_branch: true,
+      shipping_type: 'branch_pickup',
+      delivery_type: 'branch',
+      branch_id: pickup.id,
+      branch_name: pickup.name,
+      branch_address: pickup.address,
+      branch_city: pickup.city,
+      city: pickup.city,
+      governorate: pickup.city,
+      district: '',
+      shipping_address: pickup.address,
+      shipping_fee: 0,
+    });
+  }
   return { order, items };
 }

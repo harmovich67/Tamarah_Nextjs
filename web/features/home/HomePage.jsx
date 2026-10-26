@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Icon } from '@tamrna/shared/components/Icon';
 import { pickLang } from '@tamrna/shared/utils';
 import ProductCard from '@/components/product/ProductCard';
-import { asset } from '@/lib/asset';
+import { asset, FALLBACK_IMAGE } from '@/lib/asset';
 import { DEFAULT_FEATURES, DEFAULT_REVIEWS, FEATURE_ICON_MAP } from '@/data/homeDefaults';
 import HeroSlider from './HeroSlider';
 import CategoryScroller from './CategoryScroller';
@@ -253,7 +253,7 @@ function BodySection({ sec, data, text }) {
           {sec.image ? (
             <div className="promo-image">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset(sec.image)} alt="" loading="lazy" />
+              <img src={asset(sec.image || FALLBACK_IMAGE)} alt="" loading="lazy" />
             </div>
           ) : null}
           <div className="promo-copy">
@@ -338,7 +338,7 @@ function BodySection({ sec, data, text }) {
         <section className="home-section">
           <div className="home-custom-section home-custom-section--split">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={asset(sec.image)} alt={title} loading="lazy" />
+            <img src={asset(sec.image || FALLBACK_IMAGE)} alt={title} loading="lazy" />
             <div>
               <h2>{title}</h2>
               <p className="eyebrow" style={{ marginBlock: '.5rem' }}>{subtitle}</p>
@@ -360,7 +360,7 @@ function BodySection({ sec, data, text }) {
           {sec.image ? (
             <div className="home-custom-media">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset(sec.image)} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={asset(sec.image || FALLBACK_IMAGE)} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           ) : null}
           <h2>{title}</h2>
