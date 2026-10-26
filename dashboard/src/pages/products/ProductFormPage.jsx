@@ -9,7 +9,6 @@ import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { storeService } from '@/services';
 import { productSchema } from '@/schemas';
 import { config } from '@/lib/config';
-import { gramsLabel, packsFromGrams } from '@/lib/stock';
 
 // Tamrna backend: variants are weight + unit + price (+ % discount), images are a gallery, no stock / badge / sale price.
 const isLaravel = config.apiMode === 'laravel';
@@ -64,9 +63,13 @@ function VariantItem({ index: i, isLaravel, isBox, remove, register, errors, con
             {i + 1}
           </span>
           <span className="text-sm font-bold text-slate-800">
-            {i === 0 ? tr('العبوة الافتراضية الرئيسية', 'Default primary pack') : `${tr('خيار عبوة إضافي', 'Pack option')} #${i + 1}`}
+            {isBox
+              ? tr('مواصفات وسعر البوكس', 'Box specifications & price')
+              : i === 0
+              ? tr('العبوة الافتراضية الرئيسية', 'Default primary pack')
+              : `${tr('خيار عبوة إضافي', 'Pack option')} #${i + 1}`}
           </span>
-          {i === 0 ? (
+          {i === 0 && !isBox ? (
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 text-[10px] font-bold inline-flex items-center gap-1.5 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               {tr('الرئيسية بالمتجر', 'Primary')}
@@ -74,7 +77,7 @@ function VariantItem({ index: i, isLaravel, isBox, remove, register, errors, con
           ) : null}
         </div>
 
-        {i > 0 && (
+        {i > 0 && !isBox && (
           <button
             type="button"
             onClick={() => remove(i)}
@@ -91,7 +94,7 @@ function VariantItem({ index: i, isLaravel, isBox, remove, register, errors, con
         {isLaravel ? (
           <div className="sm:col-span-5">
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              {tr('الوزن والوحدة', 'Weight & unit')} <span className="text-rose-500">*</span>
+              {isBox ? tr('وزن البوكس والوحدة', 'Box weight & unit') : tr('الوزن والوحدة', 'Weight & unit')} <span className="text-rose-500">*</span>
             </label>
             <div className="flex rounded-xl shadow-2xs border border-slate-200/90 focus-within:border-primary-600 focus-within:ring-4 focus-within:ring-primary-500/10 transition-all bg-white overflow-hidden">
               <input
@@ -198,14 +201,6 @@ function VariantItem({ index: i, isLaravel, isBox, remove, register, errors, con
         )}
       </div>
 
-      {/* Per-pack stock: only for box products (is_box); otherwise the product has one stock. */}
-      {isLaravel && isBox ? (
-        <div className="sm:max-w-xs">
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">{tr('الكمية المتوفرة لهذه العبوة', 'Stock for this pack')}</label>
-          <input type="number" min="0" placeholder="0" className={INPUT} {...register(`variants.${i}.stock_quantity`)} />
-          {errors.variants?.[i]?.stock_quantity && <p className="text-[11px] text-rose-500 font-semibold mt-1">{errors.variants[i].stock_quantity.message}</p>}
-        </div>
-      ) : null}
 
       {/* Live Calculated Price Bar (shown if discount is active) */}
       {isLaravel && hasDiscount ? (
@@ -246,18 +241,19 @@ export default function ProductFormPage() {
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
   const isPreorder = useWatch({ control, name: 'is_preorder' });
   const isBox = useWatch({ control, name: 'is_box' });
-  // The stock of a regular product is grams (lib/stock.js): say how many packs of each weight it covers.
-  const stockGrams = useWatch({ control, name: 'stock_quantity' });
-  const watchedVariants = useWatch({ control, name: 'variants' });
-  const stockHint = (() => {
-    if (stockGrams === '' || stockGrams === undefined || stockGrams === null) return tr('أدخل الوزن الكلي المتوفر بالجرام (مثال: 5000 = 5 كجم).', 'Enter the total weight in stock, in grams (e.g. 5000 = 5 kg).');
-    const parts = (watchedVariants || [])
-      .map((v) => ({ v, n: packsFromGrams(stockGrams, v?.weight, v?.weight_unit) }))
-      .filter(({ n }) => n !== null)
-      .map(({ v, n }) => `${n} ${tr('عبوة', 'packs')} × ${Number(v.weight)} ${v.weight_unit === 'kg' ? tr('كجم', 'kg') : v.weight_unit === 't' ? tr('طن', 't') : tr('جرام', 'g')}`);
-    const total = gramsLabel(stockGrams, tr);
-    return parts.length ? `${total} = ${parts.join(tr(' أو ', ' or '))}` : total;
-  })();
+  const stockQty = useWatch({ control, name: 'stock_quantity' });
+  const stockHint = isBox
+    ? tr('أدخل إجمالي عدد البوكسات المتوفرة بالمخزون (مثال: 50 بوكس).', 'Enter total available boxes in stock (e.g. 50 boxes).')
+    : tr('أدخل إجمالي عدد العبوات المتوفرة بالمخزون (مثال: 50 عبوة).', 'Enter total available packs in stock (e.g. 50 packs).');
+
+  useEffect(() => {
+    if (isBox && fields.length > 1) {
+      // Box product is a single box; trim extra variants if any were added
+      for (let i = fields.length - 1; i > 0; i--) {
+        remove(i);
+      }
+    }
+  }, [isBox, fields.length, remove]);
   const categories = data?.categories || [];
 
   useEffect(() => {
@@ -375,28 +371,25 @@ export default function ProductFormPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField label={tr('الباركود', 'Barcode')} placeholder="6281234567890" dir="ltr" inputClassName="font-mono" error={err('sku')} {...register('sku')} />
-                {!isBox && (
-                  <TextField
-                    label={tr('المخزون بالجرام', 'Stock (grams)')}
-                    required
-                    type="number"
-                    min="0"
-                    hint={stockHint}
-                    error={err('stock_quantity')}
-                    inputClassName="font-bold"
-                    {...register('stock_quantity')}
-                  />
-                )}
+                <TextField
+                  label={isBox ? tr('الكمية المتوفرة بالمخزون (عدد البوكسات)', 'Stock quantity (boxes)') : tr('الكمية المتوفرة بالمخزون (عدد العبوات)', 'Stock quantity (packs)')}
+                  required
+                  type="number"
+                  min="0"
+                  placeholder="50"
+                  hint={stockHint}
+                  error={err('stock_quantity')}
+                  inputClassName="font-bold"
+                  {...register('stock_quantity')}
+                />
               </div>
               <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
                 <CheckField
-                  label={tr('منتج بوكس: المخزون لكل عبوة على حدة', 'Box product: stock is tracked per pack')}
+                  label={tr('منتج بوكس: علبة أو طقم هدايا محدد', 'Box product: specific gift box or set')}
                   hint={
                     isBox
-                      ? // Checked on the live server: the backend requires the per-pack stock of a box product but saves 0, so the
-                        // checkout refuses every box ("Available: 0") until the backend is fixed.
-                        tr('تنبيه: الخادم حالياً لا يحفظ مخزون العبوات، فمنتج البوكس يُرفض عند إتمام الطلب. استخدم المخزون بالجرام (بدون تفعيل) حتى يُصلح الباك اند.', 'Warning: the backend does not save the per-pack stock yet, so a box product is refused at checkout. Use the stock in grams (box off) until the backend is fixed.')
-                      : tr('بدون تفعيل: مخزون واحد للمنتج كله بالجرام (الحقل أعلاه)، يُخصم منه وزن العبوة مع كل بيع.', 'Off: one stock for the whole product in grams (the field above); each sale takes the pack weight off it.')
+                      ? tr('منتج بوكس: يُباع كعلبة أو طقم محدد وله مخزون بالعدد، بدون خيارات أحجام أو عبوات إضافية.', 'Box product: sold as a specific set/box with count-based stock, no extra packaging or size options.')
+                      : tr('بدون تفعيل: صنف تمور عادي يتيح إضافة أحجام وعبوات متعددة.', 'Off: regular date product with multiple size options.')
                   }
                   {...register('is_box')}
                 />
@@ -453,17 +446,19 @@ export default function ProductFormPage() {
           <SectionHeading
             icon="boxes"
             action={
-              <button
-                type="button"
-                onClick={() => append({ size_name: '', size_name_en: '', sku: '', price: '', sale_price: '', stock_quantity: '', weight: isLaravel ? 250 : '', weight_unit: 'g', discount_percent: '' })}
-                className="px-3.5 py-1.5 rounded-xl bg-primary-50 text-primary-700 hover:bg-primary-100 hover:text-primary-800 border border-primary-200/70 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-2xs active:scale-95"
-              >
-                <Icon name="plus" className="w-3.5 h-3.5" />
-                <span>{tr('إضافة حجم أو عبوة أخرى', 'Add size or pack')}</span>
-              </button>
+              !isBox ? (
+                <button
+                  type="button"
+                  onClick={() => append({ size_name: '', size_name_en: '', sku: '', price: '', sale_price: '', stock_quantity: '', weight: isLaravel ? 250 : '', weight_unit: 'g', discount_percent: '' })}
+                  className="px-3.5 py-1.5 rounded-xl bg-primary-50 text-primary-700 hover:bg-primary-100 hover:text-primary-800 border border-primary-200/70 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-2xs active:scale-95"
+                >
+                  <Icon name="plus" className="w-3.5 h-3.5" />
+                  <span>{tr('إضافة حجم أو عبوة أخرى', 'Add size or pack')}</span>
+                </button>
+              ) : null
             }
           >
-            {tr('خيارات الأوزان والعبوات المتوفرة (Variants)', 'Available weights & packs (Variants)')}
+            {isBox ? tr('سعر ووزن البوكس', 'Box price & weight') : tr('خيارات الأوزان والعبوات المتوفرة (Variants)', 'Available weights & packs (Variants)')}
           </SectionHeading>
           <div className="space-y-3">
             {fields.map((f, i) => (

@@ -25,3 +25,20 @@ export function gramsLabel(grams, tr) {
   const g = Number(grams) || 0;
   return g >= 1000 ? `${+(g / 1000).toFixed(2)} ${tr('كجم', 'kg')}` : `${g} ${tr('جرام', 'g')}`;
 }
+
+/**
+ * The form asks for the stock as a number of PACKS of the default (first) pack and the backend keeps grams: this is the
+ * conversion both ways (null when the pack weight is missing, so the caller can fall back to the number as typed).
+ */
+export function packsToGrams(packs, weight, unit) {
+  const per = gramsOf(weight, unit);
+  const n = Number(packs);
+  return per === null || !Number.isFinite(n) ? null : Math.round(n * per);
+}
+
+/** Grams -> packs of that weight, two decimals at most (750 g of 500 g packs is 1.5). */
+export function gramsToPacks(grams, weight, unit) {
+  const per = gramsOf(weight, unit);
+  const g = Number(grams);
+  return per === null || grams === null || grams === undefined || grams === '' || !Number.isFinite(g) ? null : Math.round((g / per) * 100) / 100;
+}

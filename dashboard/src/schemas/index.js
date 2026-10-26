@@ -21,7 +21,7 @@ export const productSchema = (m) =>
       description_en: z.string().default(''),
       price: num(m('السعر مطلوب', 'Price is required')).pipe(z.number().min(0, m('السعر غير صحيح', 'Invalid price'))),
       sale_price: optNum(),
-      stock_quantity: num(m('الكمية مطلوبة', 'Stock is required')).pipe(z.number().int().min(0)),
+      stock_quantity: num(m('الكمية مطلوبة', 'Stock is required')).pipe(z.number().min(0)),
       sku: z.string().trim().max(60).default(''),
       is_preorder: z.boolean().default(false),
       preorder_date: z.string().default(''),

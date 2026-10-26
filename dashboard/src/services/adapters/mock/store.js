@@ -48,6 +48,7 @@ const productRow = (p) => {
     category_name_ar: c?.name_ar,
     category_name_en: c?.name_en,
     variants_count: variants.length,
+    is_box: !!p.is_box,
     total_stock: variants.length ? variants.reduce((s, v) => s + Number(v.stock_quantity), 0) : p.stock_quantity,
     min_price: prices.length ? Math.min(...prices) : p.price,
     max_price: prices.length ? Math.max(...prices) : p.price,
@@ -125,6 +126,7 @@ const productFields = (v, image) => ({
   is_preorder: v.is_preorder ? 1 : 0,
   preorder_date: String(v.preorder_date || '').trim(),
   is_fragile: v.is_fragile ? 1 : 0,
+  is_box: v.is_box ? 1 : 0,
   featured_image: image,
 });
 

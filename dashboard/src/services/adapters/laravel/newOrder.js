@@ -1,6 +1,6 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
-import { packsFromGrams } from '@/lib/stock';
+import { gramsOf, packsFromGrams } from '@/lib/stock';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchPage, isOn, listFilters, tx, withFormErrors } from './tamrna';
 
@@ -51,14 +51,25 @@ export async function listProductChoices() {
 export async function listVariants(productId) {
   const raw = unwrap(await api.get(e.products.item(productId)));
   const product = raw?.product ?? raw;
-  const box = isOn(product?.is_box);
-  return (product?.variants || []).map((v) => ({
-    id: v.id,
-    label: `${v.weight == null ? '' : Number(v.weight)} ${v.weight_unit ?? ''}`.trim() || `#${v.id}`,
-    price: Number(v.effective_price ?? v.base_price ?? 0),
-    stock: box ? (v.stock == null ? null : Number(v.stock)) : packsFromGrams(product?.stock, v.weight, v.weight_unit),
-    isDefault: isOn(v.is_default),
-  }));
+  const numOrNull = (x) => (x === null || x === undefined || x === '' ? null : Number(x));
+  const rawStock = numOrNull(product?.stock ?? product?.stock_quantity ?? product?.quantity);
+  return (product?.variants || []).map((v) => {
+    const vStock = numOrNull(v.stock ?? v.stock_quantity ?? v.quantity);
+    const per = gramsOf(v.weight, v.weight_unit) || 1;
+    let stock = 0;
+    if (vStock !== null && vStock > 0) {
+      stock = vStock;
+    } else if (rawStock !== null && rawStock > 0) {
+      stock = rawStock >= per ? Math.floor(rawStock / per) : rawStock;
+    }
+    return {
+      id: v.id,
+      label: `${v.weight == null ? '' : Number(v.weight)} ${v.weight_unit ?? ''}`.trim() || `#${v.id}`,
+      price: Number(v.effective_price ?? v.base_price ?? 0),
+      stock,
+      isDefault: isOn(v.is_default),
+    };
+  });
 }
 
 /** Registered clients matching a keyword (name / phone / e-mail), ten at a time (`keyword`, checked on the live server). */

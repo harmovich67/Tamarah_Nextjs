@@ -9,7 +9,6 @@ import { useQueryParam } from '@/hooks/useQueryState';
 import { usePermissions } from '@/hooks/usePermissions';
 import { storeService } from '@/services';
 import { config } from '@/lib/config';
-import { gramsLabel } from '@/lib/stock';
 
 export const assetSrc = (p) => (!p ? '' : /^(https?:|data:)/.test(p) ? p : `/${String(p).replace(/^\//, '')}`);
 
@@ -83,24 +82,19 @@ export default function ProductsPage() {
       header: t('admin_col_stock'),
       align: 'center',
       sortValue: (p) => Number(p.total_stock),
-      cell: (p) => (
-        p.stock_out || (p.total_stock != null && Number(p.total_stock) <= 0) ? (
-          <span className="inline-flex flex-col items-center gap-0.5">
-            <span className="px-2.5 py-1 rounded-xl font-black text-xs border bg-rose-50 text-rose-700 border-rose-200/70">{tr('نفد', 'Sold out')}</span>
-            {/* A stock in grams smaller than one pack: the checkout sells none of it. */}
-            {p.stock_grams > 0 && <span className="text-[10px] text-slate-400 font-semibold">{gramsLabel(p.stock_grams, tr)}</span>}
-          </span>
+      cell: (p) => {
+        const hasStock = p.total_stock != null && Number(p.total_stock) > 0;
+        const isOutOfStock = !hasStock || !!p.stock_out;
+        return isOutOfStock ? (
+          <span className="px-2.5 py-1 rounded-xl font-black text-xs border bg-rose-50 text-rose-700 border-rose-200/70">{tr('نفد', 'Sold out')}</span>
         ) : p.total_stock == null ? (
           <span className="text-slate-400">—</span>
         ) : (
-          <span className="inline-flex flex-col items-center gap-0.5">
-            <span className={cx('px-2.5 py-1 rounded-xl font-black text-xs border', p.total_stock <= 15 ? 'bg-amber-50 text-amber-800 border-amber-200/70' : 'bg-emerald-50 text-emerald-800 border-emerald-200/70')}>
-              {Number(p.total_stock)} {tr('عبوة', 'units')}
-            </span>
-            {p.stock_grams != null && <span className="text-[10px] text-slate-400 font-semibold">{gramsLabel(p.stock_grams, tr)}</span>}
+          <span className={cx('px-2.5 py-1 rounded-xl font-black text-xs border', p.total_stock <= 15 ? 'bg-amber-50 text-amber-800 border-amber-200/70' : 'bg-emerald-50 text-emerald-800 border-emerald-200/70')}>
+            {Number(p.total_stock)} {p.is_box ? tr('بوكس', 'boxes') : tr('عبوة', 'units')}
           </span>
-        )
-      ),
+        );
+      },
     },
     {
       key: 'type',

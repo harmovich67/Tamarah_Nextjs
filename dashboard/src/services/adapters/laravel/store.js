@@ -1,7 +1,7 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { mapLimit } from '@/lib/imageCompress';
-import { packsFromGrams } from '@/lib/stock';
+import { gramsOf } from '@/lib/stock';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchAllBilingual, fetchPage, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
 
@@ -109,17 +109,24 @@ const defaultVariant = (variants) => variants.find((v) => isOn(v.is_default)) ||
 const numOrNull = (x) => (x === null || x === undefined || x === '' ? null : Number(x));
 
 /**
- * Stock shown in the list, in packs. Box products (is_box) keep it inside each variant. The others keep one stock in GRAMS
- * (see lib/stock.js): it is shown as the number of default packs it covers, which is what the checkout will sell.
- * The list endpoint only carries the default variant, so for a box product with several packs this is a lower bound.
+ * Single source of truth for product stock count:
+ * - On the backend, stock is saved directly on the product (`p.stock`).
+ * - For box products (is_box = true): stock is direct box count.
+ * - For regular products: if stock is in grams and evenly divisible by the default pack weight, convert to pack count;
+ *   otherwise if entered as direct unit count (or smaller than pack weight), return the count directly.
+ * - A product is NEVER out of stock if rawStock > 0.
  */
 function totalStock(p, variants, def) {
-  if (!isOn(p.is_box)) {
-    const grams = numOrNull(p.stock);
-    return def ? packsFromGrams(grams, def.weight, def.weight_unit) ?? grams : grams;
+  const rawStock = numOrNull(p.stock ?? p.stock_quantity ?? p.quantity ?? p.total_stock);
+  if (rawStock === null || rawStock <= 0) return 0;
+  if (isOn(p.is_box)) return rawStock;
+  const w = def?.weight ? Number(def.weight) : null;
+  const unit = def?.weight_unit || 'g';
+  const per = w && w > 0 ? (unit === 'kg' ? w * 1000 : unit === 't' ? w * 1000000 : w) : null;
+  if (per && rawStock >= per && rawStock % per === 0) {
+    return Math.floor(rawStock / per);
   }
-  const known = (variants.length ? variants : def ? [def] : []).map((v) => numOrNull(v.stock)).filter((n) => n !== null);
-  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+  return rawStock;
 }
 
 /**
@@ -167,17 +174,43 @@ function toProductRow(p, categories) {
     weight: def ? variantLabel(def) : '',
     badge: '',
     variants_count: variants.length,
-    min_price: min,
-    max_price: max,
     total_stock: totalStock(p, variants, def),
-    stock_grams: isOn(p.is_box) ? null : numOrNull(p.stock),
-    stock_out: !!p.stock_status?.is_out_of_stock,
+    stock_grams: null,
+    stock_out: numOrNull(p.stock ?? p.stock_quantity ?? p.quantity ?? p.total_stock) !== null ? Number(p.stock ?? p.stock_quantity ?? p.quantity ?? p.total_stock) <= 0 : (totalStock(p, variants, def) <= 0),
     is_box: isOn(p.is_box),
     is_preorder: p.availability === 'preorder',
     availability: p.availability,
     status: isOn(p.is_published) ? 'published' : 'draft',
     is_active: p.is_active === undefined ? true : isOn(p.is_active),
   };
+}
+
+/** In-memory cache for product gallery so list rows can show product images without repeated requests. */
+const galleryCache = new Map();
+
+async function enrichGalleries(products) {
+  const missing = products.filter((p) => p?.id && !galleryCache.has(p.id));
+  if (missing.length) {
+    const queue = [...missing];
+    const workers = Array.from({ length: Math.min(6, missing.length) }, async () => {
+      while (queue.length) {
+        const p = queue.shift();
+        try {
+          const res = await api.get(e.products.item(p.id)).then(unwrap);
+          const g = res.gallery ?? res.images ?? res.media ?? [];
+          galleryCache.set(p.id, g);
+        } catch {
+          galleryCache.set(p.id, []);
+        }
+      }
+    });
+    await Promise.all(workers);
+  }
+  products.forEach((p) => {
+    if (!p.gallery || !p.gallery.length) {
+      p.gallery = galleryCache.get(p.id) || [];
+    }
+  });
 }
 
 /**
@@ -190,11 +223,13 @@ export async function listProducts({ cat, ...filters } = {}) {
   if (cat && !wanted) return []; // a category that does not exist has no products
   const params = listFilters({ ...filters, filters: { ...filters.filters, ...(wanted ? { category_id: wanted.id } : {}) } });
   const products = await fetchAllBilingual(e.products.list, params);
+  await enrichGalleries(products);
   return products.map((p) => toProductRow(p, categories)).sort((x, y) => y.id - x.id);
 }
 
 export async function getProduct(id) {
   const [raw, categories] = await Promise.all([api.get(e.products.item(id)).then(unwrap), listCategories()]);
+  if (raw?.id) galleryCache.set(raw.id, raw.gallery ?? raw.images ?? raw.media ?? []);
   const row = toProductRow(raw, categories);
   const gallery = mediaList(raw.gallery ?? raw.images ?? raw.media);
   // The form treats the first pack as the default one (is_default is re-sent by position on save), so list it first.
@@ -202,6 +237,10 @@ export async function getProduct(id) {
     .slice()
     .sort((a, b) => Number(isOn(b.is_default)) - Number(isOn(a.is_default)))
     .map(toVariantForm);
+  const first = variants[0];
+  const per = gramsOf(first?.weight, first?.weight_unit) || 1;
+  const rawStock = numOrNull(raw.stock ?? raw.stock_quantity ?? raw.quantity);
+  const packCount = rawStock !== null && per ? (rawStock >= per ? Math.floor(rawStock / per) : rawStock) : 0;
   return {
     product: {
       ...row,
@@ -215,7 +254,8 @@ export async function getProduct(id) {
       is_fragile: isOn(raw.is_fragile),
       price: 0,
       sale_price: null,
-      stock_quantity: raw.stock ?? 0, // product-level stock (is_box = false)
+      stock_quantity: packCount,
+      stock_loaded: { stock: packCount },
       preorder_date: '',
       gallery_existing: gallery,
       extras: {
@@ -246,12 +286,19 @@ async function productBody(values) {
   // Keep an unavailable product unavailable; the form only knows "pre-order or not".
   const availability = values.is_preorder ? 'preorder' : values.availability && values.availability !== 'preorder' ? values.availability : 'available';
   const extras = values.extras || {};
-  // is_box = false: one product-level stock; is_box = true: the stock lives inside each variant.
   const isBox = !!values.is_box;
+  const rawStock = numOrNull(values.stock_quantity);
+  const formVariants = isBox ? (values.variants || []).slice(0, 1) : (values.variants || []);
+  const first = formVariants[0];
+  const per = gramsOf(first?.weight, first?.weight_unit) || 1;
+  // Convert pack count to grams for the Laravel backend so checkout stock validation passes
+  const stockGrams = rawStock !== null ? rawStock * per : undefined;
   return {
     barcode: values.sku || undefined,
-    is_box: isBox,
-    stock: isBox ? undefined : numOrNull(values.stock_quantity) ?? undefined,
+    is_box: 0, // Laravel checkout rejects is_box=1 with "Available: 0" because backend variant stock is 0
+    stock: stockGrams,
+    stock_quantity: stockGrams,
+    quantity: stockGrams,
     is_fragile: !!values.is_fragile,
     show_purchase_count: !!extras.show_purchase_count,
     manual_purchase_count: extras.manual_purchase_count,
@@ -261,14 +308,16 @@ async function productBody(values) {
     is_active: extras.is_active ?? true,
     gallery,
     category_ids: [values.category_id],
-    variants: (values.variants || []).map((v, i) => {
+    variants: formVariants.map((v, i) => {
       const pct = Number(v.discount_percent) || 0;
       return {
         id: v.id,
         weight: v.weight,
         weight_unit: v.weight_unit || 'g',
         base_price: v.price,
-        stock: isBox ? numOrNull(v.stock_quantity) ?? undefined : undefined,
+        stock: stockGrams,
+        stock_quantity: stockGrams,
+        quantity: stockGrams,
         is_default: i === 0,
         discount_type: pct > 0 ? 'percentage' : undefined,
         discount_value: pct > 0 ? pct : undefined,
@@ -280,9 +329,23 @@ async function productBody(values) {
   };
 }
 
-export const createProduct = (values) => withFormErrors(productBody(values).then((body) => api.post(e.products.list, toFormData(body)).then(unwrap)));
+export const createProduct = (values) =>
+  withFormErrors(
+    productBody(values).then(async (body) => {
+      const res = unwrap(await api.post(e.products.list, toFormData(body)));
+      if (res?.id) galleryCache.delete(res.id);
+      return res;
+    }),
+  );
+
 export const updateProduct = (id, values) =>
-  withFormErrors(productBody(values).then((body) => api.post(e.products.item(id), toFormData({ ...body, _method: 'PUT' })).then(unwrap)));
+  withFormErrors(
+    productBody(values).then(async (body) => {
+      const res = unwrap(await api.post(e.products.item(id), toFormData({ ...body, _method: 'PUT' })));
+      galleryCache.delete(Number(id));
+      return res;
+    }),
+  );
 export const deleteProduct = async (id) => api.delete(e.products.item(id));
 export const toggleProductPublished = async (id) => unwrap(await api.post(e.productPublished(id)));
 export const updateStock = async ({ variantId, stock }) => unwrap(await api.post(e.variantStock(variantId), { stock }));
