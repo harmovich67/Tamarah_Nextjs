@@ -2,7 +2,7 @@ import { formatMoney2 } from '@tamrna/shared/utils';
 import { getClientLocale } from '@/lib/locale-client';
 import { getStoredUser } from '@/lib/session';
 import { createAddress, findSavedAddress, getOrder as getAccountOrder, loadCities, savedAddresses, zonesOf } from './account';
-import { api, form, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder, unsupported, unwrap } from './http';
+import { api, form, guestToken, localPhone, needsLogin, num, PHONE_CODE, rowsOf, t, toOrder, unsupported, unwrap } from './http';
 /**
  * Checkout against the Tamrna backend: `POST /client/orders/checkout { address_id, gift_card_code, delivery_type }`
  * with `delivery_type` = `delivery` (home) | `branch` (pickup) | `private`. The backend takes the cart of the signed-in
@@ -123,18 +123,31 @@ export async function placeOrder(input) {
 }
 
 /**
- * The cart can hold lines of products deleted since (the cart answer hides them, the checkout refuses with 422
- * `unavailable_items`): take those lines out so the next try goes through, and say so.
+ * The checkout refuses with 422 `unavailable_items` when the cart holds lines of deleted products or more than the stock:
+ * bring the cart to what can be sold so the next try goes through, and say so.
  */
 async function dropUnavailable(error) {
   const lines = error?.data?.data?.unavailable_items;
   if (!Array.isArray(lines) || !lines.length) return;
-  // A line with quantities (`requested_quantity` / `available_quantity`) is a stock shortage: the product exists, so the line
-  // stays in the cart and the customer is told what is available. A line without them belongs to a product that is gone: the
-  // cart answer hides it but the checkout refuses it, so it is removed.
+  // A line without quantities belongs to a product that is gone (the cart answer hides it but the checkout refuses it). A line
+  // with `requested_quantity` / `available_quantity` is a stock shortage. The public product answer carries no stock (every pack
+  // says 0), so the storefront cannot see a shortage before the checkout: the cart is brought to what the backend can sell
+  // (an out-of-stock line is removed, a short one lowered to the available quantity) so the next try goes through, and the
+  // customer is told what changed.
   const gone = lines.filter((i) => i.requested_quantity === undefined && i.available_quantity === undefined);
-  await Promise.all(gone.map((i) => api.delete(`/client/cart/items/${i.item_id}`).catch(() => null)));
   const short = lines.filter((i) => !gone.includes(i));
+  const left = (i) => Math.max(0, Math.floor(Number(i.available_quantity)));
+  const cartPath = (i) => `/client/cart/items/${i.item_id}?guest_token=${encodeURIComponent(guestToken())}`;
+  await Promise.all(
+    lines
+      .filter((i) => i.item_id !== undefined && i.item_id !== null)
+      .map((i) => {
+        if (gone.includes(i)) return api.delete(cartPath(i)).catch(() => null);
+        // No number to go by: the line stays and the backend reason is shown.
+        if (!Number.isFinite(Number(i.available_quantity))) return null;
+        return left(i) > 0 ? api.post(cartPath(i), form({ _method: 'put', quantity: left(i) })).catch(() => null) : api.delete(cartPath(i)).catch(() => null);
+      }),
+  );
   // "250.0000 g" -> "250 جرام"
   const weightOf = (raw) => {
     const n = parseFloat(raw);
@@ -148,11 +161,11 @@ async function dropUnavailable(error) {
     parts.push(
       short
         .map((i) => {
-          const left = Number(i.available_quantity);
-          if (!Number.isFinite(left)) return `${named(i)}: ${i.reason || t('الكمية غير متوفرة', 'not available in this quantity')}`;
-          return left > 0
-            ? `${named(i)}: ${t(`المتاح ${left} فقط والمطلوب ${i.requested_quantity}`, `only ${left} available, ${i.requested_quantity} requested`)}`
-            : `${named(i)}: ${t('غير متوفر حالياً', 'currently out of stock')}`;
+          if (!Number.isFinite(Number(i.available_quantity))) return `${named(i)}: ${i.reason || t('الكمية غير متوفرة', 'not available in this quantity')}`;
+          const n = left(i);
+          return n > 0
+            ? `${named(i)}: ${t(`المتاح ${n} فقط، فعُدّلت الكمية في السلة إلى ${n}`, `only ${n} available, the quantity in your cart was set to ${n}`)}`
+            : `${named(i)}: ${t('نفد من المخزون وأُزيل من السلة', 'out of stock, removed from your cart')}`;
         })
         .join(t('، ', ', ')),
     );
