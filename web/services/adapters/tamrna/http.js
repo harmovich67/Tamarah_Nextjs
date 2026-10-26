@@ -161,26 +161,20 @@ function extractDeliveryType(o) {
 
 function isBranchOrder(o, addressLine = '') {
   const rawDelivery = extractDeliveryType(o);
-  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
-  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
 
-  const hasBranch = Boolean(
-    (branchId && String(branchId) !== '0') ||
-    (branch && typeof branch === 'object' && Object.keys(branch).length > 0) ||
-    (typeof branch === 'string' && branch.trim() !== '') ||
-    o.branch_name
-  );
+  // If explicitly home delivery, it's definitely NOT branch pickup
+  if (
+    rawDelivery === 'delivery' ||
+    rawDelivery === 'home_delivery' ||
+    rawDelivery === '1' ||
+    rawDelivery === 'home' ||
+    rawDelivery.includes('توصيل')
+  ) {
+    return false;
+  }
 
-  const isPickupFlag = Boolean(
-    o.is_pickup === 1 || o.is_pickup === '1' || o.is_pickup === true ||
-    o.is_branch === 1 || o.is_branch === '1' || o.is_branch === true ||
-    o.pickup === 1 || o.pickup === '1' || o.pickup === true ||
-    o.is_delivery === 0 || o.is_delivery === '0' || o.is_delivery === false
-  );
-
-  const isReadyStatus = o.status === 'ready' || o.order_status === 'ready' || o.shipping_status === 'ready';
-
-  const deliveryMatches =
+  // Explicit branch delivery types
+  if (
     rawDelivery === 'branch' ||
     rawDelivery === 'branch_pickup' ||
     rawDelivery === 'pickup' ||
@@ -191,20 +185,41 @@ function isBranchOrder(o, addressLine = '') {
     rawDelivery === 'takeaway' ||
     rawDelivery === 'self_pickup' ||
     rawDelivery === '2' ||
-    rawDelivery.includes('فرع') ||
-    rawDelivery.includes('استلام');
+    rawDelivery.includes('استلام من الفرع') ||
+    rawDelivery.includes('استلام الفرع')
+  ) {
+    return true;
+  }
 
+  // Check branch ID or branch object
+  const branchId = pick(o, ['branch_id', 'store_id', 'pickup_branch_id'], null);
+  if (branchId !== null && branchId !== undefined && branchId !== '' && branchId !== 0 && branchId !== '0') {
+    return true;
+  }
+
+  const branch = pick(o, ['branch', 'store', 'pickup_branch'], null);
+  if (branch && typeof branch === 'object' && (branch.id || branch.name)) {
+    return true;
+  }
+
+  // Explicit pickup boolean flags
+  if (o.is_pickup === 1 || o.is_pickup === '1' || o.is_pickup === true) return true;
+  if (o.is_branch === 1 || o.is_branch === '1' || o.is_branch === true) return true;
+  if (o.pickup === 1 || o.pickup === '1' || o.pickup === true) return true;
+
+  // Status is ready (only branch pickup orders have the 'ready' stage)
+  if (o.status === 'ready' || o.order_status === 'ready' || o.shipping_status === 'ready') {
+    return true;
+  }
+
+  // Explicit text match in address or notes
   const addrText = typeof o.address === 'string' ? o.address : typeof o.shipping_address === 'string' ? o.shipping_address : addressLine;
   const notesText = String(o.notes || o.note || '');
-  const textMatches =
-    addrText.includes('فرع') ||
-    addrText.includes('استلام') ||
-    notesText.includes('فرع') ||
-    notesText.includes('استلام');
+  if (addrText.includes('استلام من الفرع') || notesText.includes('استلام من الفرع') || addrText.includes('استلام الفرع')) {
+    return true;
+  }
 
-  const zeroFeeNoAddress = Number(o.shipping_fee ?? o.delivery_fee ?? 0) === 0 && (!addrText || addrText.trim() === '' || addrText === 'العنوان الوطني المسجل');
-
-  return deliveryMatches || hasBranch || isPickupFlag || isReadyStatus || textMatches || zeroFeeNoAddress;
+  return false;
 }
 
 export function toOrder(input) {

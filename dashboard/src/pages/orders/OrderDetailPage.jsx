@@ -137,22 +137,25 @@ export default function OrderDetailPage() {
   if (error) return <ErrorState title={tr('تعذر تحميل الطلب', 'Could not load the order')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />;
 
   const { order, items } = data;
+  const isDeliveryType =
+    order.shipping_type === 'delivery' ||
+    order.shipping_type === 'home_delivery' ||
+    order.delivery_type === 'delivery';
+
   const detectedIsBranch = Boolean(
-    order.is_branch ||
-    order.shipping_type === 'branch_pickup' ||
-    order.shipping_type === 'branch' ||
-    order.delivery_type === 'branch' ||
-    order.shipping_type === 'pickup' ||
-    order.delivery_type === 'pickup' ||
-    order.is_pickup ||
-    (order.branch_id && String(order.branch_id) !== '0') ||
-    Boolean(order.branch_name) ||
-    String(order.shipping_address || '').includes('فرع') ||
-    String(order.shipping_address || '').includes('استلام') ||
-    String(order.notes || '').includes('فرع') ||
-    String(order.notes || '').includes('استلام') ||
-    order.shipping_status === 'ready' ||
-    (Number(order.shipping_fee || 0) === 0 && (!order.shipping_address || order.shipping_address === 'العنوان الوطني المسجل'))
+    !isDeliveryType && (
+      order.is_branch === true ||
+      order.shipping_type === 'branch_pickup' ||
+      order.shipping_type === 'branch' ||
+      order.delivery_type === 'branch' ||
+      order.shipping_type === 'pickup' ||
+      order.delivery_type === 'pickup' ||
+      order.is_pickup ||
+      (order.branch_id && String(order.branch_id) !== '0') ||
+      order.shipping_status === 'ready' ||
+      String(order.shipping_address || '').includes('استلام من الفرع') ||
+      String(order.notes || '').includes('استلام من الفرع')
+    )
   );
 
   const isBranch = overrideBranch !== null ? overrideBranch : detectedIsBranch;

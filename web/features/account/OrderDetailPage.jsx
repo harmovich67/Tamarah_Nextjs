@@ -66,22 +66,25 @@ function Body({ data: d, cancel: c }) {
   const showStepper = String(settings.enable_order_tracking_stepper ?? '1') === '1';
   const allowCancel = settings.allow_customer_order_cancellation && STEP1.includes(shippingStatus) && order.payment_status !== 'paid';
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
+  const isDeliveryType =
+    order.shipping_type === 'delivery' ||
+    order.shipping_type === 'home_delivery' ||
+    order.delivery_type === 'delivery';
+
   const isBranch = Boolean(
-    order.is_branch ||
-    order.shipping_type === 'branch_pickup' ||
-    order.shipping_type === 'branch' ||
-    order.delivery_type === 'branch' ||
-    order.shipping_type === 'pickup' ||
-    order.delivery_type === 'pickup' ||
-    order.is_pickup ||
-    (order.branch_id && String(order.branch_id) !== '0') ||
-    Boolean(order.branch_name) ||
-    String(order.shipping_address || '').includes('فرع') ||
-    String(order.shipping_address || '').includes('استلام') ||
-    String(order.notes || '').includes('فرع') ||
-    String(order.notes || '').includes('استلام') ||
-    order.shipping_status === 'ready' ||
-    (Number(order.shipping_fee || 0) === 0 && (!order.shipping_address || order.shipping_address === 'العنوان الوطني المسجل'))
+    !isDeliveryType && (
+      order.is_branch === true ||
+      order.shipping_type === 'branch_pickup' ||
+      order.shipping_type === 'branch' ||
+      order.delivery_type === 'branch' ||
+      order.shipping_type === 'pickup' ||
+      order.delivery_type === 'pickup' ||
+      order.is_pickup ||
+      (order.branch_id && String(order.branch_id) !== '0') ||
+      order.shipping_status === 'ready' ||
+      String(order.shipping_address || '').includes('استلام من الفرع') ||
+      String(order.notes || '').includes('استلام من الفرع')
+    )
   );
 
   const deliverySteps = [
