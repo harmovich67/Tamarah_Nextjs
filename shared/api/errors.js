@@ -105,7 +105,8 @@ export function toFriendlyMessage(error, locale = 'ar') {
   if (error.code === ERROR_CODES.SESSION_EXPIRED) return m.session;
   if (status >= 500) return m[status] || m[500];
   if (status === 422) {
-    const first = Object.values(error.errors || {}).flat()[0];
+    // Only text is ever shown: an object here would crash the page when it is rendered (React error #31).
+    const first = Object.values(error.errors || {}).flat().find((x) => typeof x === 'string' && x);
     // e.g. "The code is incorrect": a 422 whose only content is the backend message.
     return first || (isBackendFailure(error) && error.message) || m[422];
   }

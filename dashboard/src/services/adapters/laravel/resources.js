@@ -59,8 +59,9 @@ async function toBody(values, cfg) {
       body.ar = { ...body.ar, [f.name]: ar };
       body.en = { ...body.en, [f.name]: en };
     } else if (f.kind === 'image') {
+      // Checked on the live server: sending the CURRENT image's own id on an edit DELETES the image, while leaving `image` out
+      // keeps it. So the picture is sent only when a new file was chosen.
       if (v instanceof File) body[f.name] = await uploadMedia(v, { model: cfg.model, option: f.option || 'image' });
-      else if (values[`${f.name}_id`] != null && values[`${f.name}_id`] !== '') body[f.name] = values[`${f.name}_id`];
     } else if (f.kind === 'images') {
       const ids = [...(values[`${f.name}_ids`] || [])];
       const existing = values[f.name] || [];
@@ -200,7 +201,9 @@ export const resources = {
       { name: 'type' },
       { name: 'title', kind: 'bilingual' },
       { name: 'description', kind: 'bilingual' },
-      { name: 'images', kind: 'images' },
+      // The upload option of a section's pictures is `images` (`image` answers 422 "الخيار المحدد غير صالح لهذا النموذج").
+      // `images[]` only adds pictures: the ones already on the section stay.
+      { name: 'images', kind: 'images', option: 'images' },
     ],
   }),
   branches: makeResource({

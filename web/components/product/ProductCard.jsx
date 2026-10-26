@@ -45,7 +45,15 @@ export default function ProductCard({ product: p, extraClass = '', rank = 0 }) {
       <div className="product-card-media">
         <Link className="product-image-link" href={href}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset(p.featured_image || p.image || 'assets/images/home/ajwa.webp')} alt={name} loading="lazy" />
+          <img
+            src={asset(p.featured_image || p.image || 'assets/images/home/ajwa.webp')}
+            alt={name}
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = asset('assets/images/home/ajwa.webp');
+            }}
+          />
         </Link>
 
         <div className="product-badges">

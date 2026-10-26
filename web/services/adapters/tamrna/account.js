@@ -77,21 +77,47 @@ export async function changePassword({ currentPassword, password }) {
 // ----------------------------------------------------------------------------------------------------- addresses
 const cityOfAddress = (a) => text(pick(a, ['city', 'city_name'], ''));
 
+/**
+ * The backend address has only street, district, city, national address and the default flag (checked on the live server: the
+ * recipient name, the mobile and the label "Home / Work" are not fields, and the list does not even return `national_address`).
+ * What the form asks for beyond that is kept in this browser, per address id, and merged back when the addresses are read.
+ */
+const META_KEY = 'tamrna.web.address-meta';
+const readMeta = () => {
+  try {
+    return typeof window === 'undefined' ? {} : JSON.parse(window.localStorage.getItem(META_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+const writeMeta = (id, meta) => {
+  try {
+    const all = readMeta();
+    if (meta) all[id] = meta;
+    else delete all[id];
+    window.localStorage.setItem(META_KEY, JSON.stringify(all));
+  } catch {
+    /* private mode: the address still saves, only the extra details are not kept */
+  }
+};
+
 /** Backend address -> the screens' address. The form's building / landmark are kept in `national_address` / `district`. */
 function toAddress(a, user) {
   const street = a.street ?? '';
+  const meta = readMeta()[a.id] || {};
   return {
     id: a.id,
-    title: t('المنزل', 'Home'),
-    recipient_name: user?.name || '',
-    phone: user?.phone || '',
+    title: meta.title || t('المنزل', 'Home'),
+    recipient_name: meta.recipient_name || user?.name || '',
+    phone: meta.phone || user?.phone || '',
     city: cityOfAddress(a),
     city_id: a.city_id ?? a.city?.id ?? null,
     governorate: cityOfAddress(a),
     district: a.district ?? '',
     street_address: street,
-    building_floor: a.national_address ?? '',
-    landmark: a.district ?? '',
+    building_floor: meta.building_floor ?? a.national_address ?? '',
+    // The landmark is what the customer typed (kept here); without it nothing is shown: the district is derived from the street.
+    landmark: meta.landmark ?? a.district ?? '',
     address: [street, a.district, a.national_address].filter(Boolean).join(' - '),
     is_default: a.is_default ? 1 : 0,
   };
@@ -133,21 +159,30 @@ export function findSavedAddress(rows, { street, city }) {
 export async function saveAddress(input) {
   requireUser();
   const street = String(input.street_address || '').trim();
+  // The backend REQUIRES the district ("حقل الحي مطلوب"), but the form has no field of its own for it: it is the first part of
+  // "District & street" ("حي الملقا، شارع ..."), or the city when that has no separator.
+  const landmark = String(input.landmark || '').trim();
+  const districtOf = () => street.split(/[،,\-–]/)[0].trim().slice(0, 100) || String(input.city || '').trim();
   const body = form({
     city_id: await cityId(input.city),
     street,
     national_address: String(input.building_floor || '').trim() || street,
-    district: String(input.landmark || '').trim() || undefined,
+    district: landmark || districtOf(),
     is_default: !!input.is_default,
     _method: input.id ? 'put' : undefined,
   });
   const res = unwrap(await api.post(input.id ? `/client/addresses/${input.id}` : '/client/addresses', body));
-  return toAddress(res && typeof res === 'object' ? res : { id: input.id }, getStoredUser());
+  const saved = res && typeof res === 'object' ? res : { id: input.id };
+  const id = saved.id ?? input.id;
+  // The label, recipient and mobile the backend has no field for.
+  if (id) writeMeta(id, { title: input.title, recipient_name: String(input.recipient_name || '').trim(), phone: String(input.phone || '').trim(), building_floor: String(input.building_floor || '').trim(), landmark });
+  return toAddress({ ...saved, id }, getStoredUser());
 }
 
 export async function deleteAddress(id) {
   requireUser();
   await api.delete(`/client/addresses/${id}`);
+  writeMeta(id, null);
   return { success: true };
 }
 

@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { config } from '@/lib/config';
 import { safeRedirect } from '@/lib/redirect';
 import AuthShell, { DemoNotice, PasswordInput, SocialButtons } from './AuthShell';
+import PhoneCodeSelect, { DEFAULT_PHONE_CODE } from './PhoneCodeSelect';
 
 function Form() {
   const { locale, tr } = useLocale();
@@ -32,8 +33,9 @@ function Form() {
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(loginSchema(locale)), defaultValues: { identity: '', password: '' } });
+  } = useForm({ resolver: zodResolver(loginSchema(locale)), defaultValues: { identity: '', password: '', phone_code: DEFAULT_PHONE_CODE } });
 
   // Already signed in -> same redirects as AuthController::showLogin()
   useEffect(() => {
@@ -48,7 +50,8 @@ function Form() {
   const onSubmit = async (values) => {
     setServerError('');
     try {
-      const session = await authService.login(values);
+      // `phone_code` is not part of the validation schema (it would be stripped): read it from the form directly.
+      const session = await authService.login({ ...values, phone_code: getValues('phone_code') || DEFAULT_PHONE_CODE });
       setSession(session);
       qc.invalidateQueries();
       if (['super_admin', 'store_manager'].includes(session.user.role_name)) {
@@ -71,9 +74,13 @@ function Form() {
       <form noValidate className="auth-form" onSubmit={handleSubmit(onSubmit)}>
         <fieldset disabled={isSubmitting}>
           <FormField id="auth-identity" label={tr('رقم الجوال أو البريد الإلكتروني', 'Mobile number or email')} required error={errors.identity?.message}>
-            <div className="auth-input-wrap">
-              <Icon name="user-round" size={19} />
-              <input id="auth-identity" className="input" placeholder={tr('رقم الجوال أو البريد الإلكتروني', 'Mobile number or email')} autoComplete="username" maxLength={254} aria-invalid={errors.identity ? 'true' : undefined} {...register('identity')} />
+            {/* The backend asks for the country code with every sign-in (also with an e-mail), so it is always next to the field. */}
+            <div className="auth-phone-row" dir="ltr">
+              <PhoneCodeSelect registration={register('phone_code')} />
+              <div className="auth-input-wrap">
+                <Icon name="user-round" size={19} />
+                <input id="auth-identity" className="input" placeholder={tr('رقم الجوال أو البريد الإلكتروني', 'Mobile number or email')} autoComplete="username" maxLength={254} aria-invalid={errors.identity ? 'true' : undefined} {...register('identity')} />
+              </div>
             </div>
           </FormField>
 

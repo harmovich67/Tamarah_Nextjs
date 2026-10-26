@@ -26,9 +26,10 @@ function sessionFrom(res, fallback) {
   return { token, user: toUser(data, fallback) };
 }
 
-export async function login({ identity, password }) {
+export async function login({ identity, password, phone_code }) {
   const id = String(identity || '').trim();
-  const body = form({ auth: isEmail(id) ? id : localPhone(id), password, phone_code: isEmail(id) ? undefined : PHONE_CODE, ...DEVICE });
+  // The backend requires `phone_code` on EVERY sign-in, also with an e-mail (422 "حقل كود الدول مطلوب", checked on the live server).
+  const body = form({ auth: isEmail(id) ? id : localPhone(id), password, phone_code: phone_code || PHONE_CODE, ...DEVICE });
   const res = await api.post(`/client/login?guest_token=${encodeURIComponent(guestToken())}`, body);
   return sessionFrom(res, isEmail(id) ? { email: id } : { phone: localPhone(id) });
 }

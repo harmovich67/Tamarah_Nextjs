@@ -120,6 +120,9 @@ function CheckoutForm() {
       if (/^https?:\/\//.test(url)) window.location.assign(url);
       else router.push(url);
     } catch (error) {
+      // A refused order (422: the cart was emptied elsewhere, lines removed as unavailable...) re-reads the cart, so the page
+      // shows what the backend holds (an empty cart sends the customer back to /cart).
+      if (error?.status === 422) qc.invalidateQueries({ queryKey: cartKey });
       showToast(toFriendlyMessage(error, locale), 'error');
     }
   };

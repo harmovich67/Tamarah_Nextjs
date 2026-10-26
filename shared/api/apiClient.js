@@ -90,7 +90,10 @@ export function createApiClient(options) {
     let errors = (body && typeof body === 'object' && body.errors) || {};
     // The Tamrna backend sends validation errors as `data: { field: [messages] }` (no `errors` key).
     const d = body && typeof body === 'object' ? body.data : null;
-    if (!Object.keys(errors).length && status === 422 && d && typeof d === 'object' && !Array.isArray(d) && Object.values(d).every(Array.isArray)) errors = d;
+    // Only a map of field -> list of TEXT messages counts: a 422 may also carry data such as `{ unavailable_items: [{ ... }] }`
+    // (objects), which is not a validation error and must never be shown as a message.
+    const isFieldErrors = d && typeof d === 'object' && !Array.isArray(d) && Object.values(d).every((v) => Array.isArray(v) && v.every((x) => typeof x === 'string'));
+    if (!Object.keys(errors).length && status === 422 && isFieldErrors) errors = d;
     let code = ERROR_CODES.HTTP;
     if (status === 401) code = ERROR_CODES.SESSION_EXPIRED;
     else if (status === 403) code = ERROR_CODES.FORBIDDEN;

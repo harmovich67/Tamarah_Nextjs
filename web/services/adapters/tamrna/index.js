@@ -23,10 +23,23 @@ const rowsOf = (res) => {
 const lastPageOf = (res) => res?.meta?.last_page ?? res?.data?.meta?.last_page ?? 1;
 const inLang = (lang) => ({ headers: { 'Accept-Language': lang } });
 
+/**
+ * A read is retried once when the connection itself failed ("fetch failed": the request never got an answer, seen from the
+ * Next server now and then). Answers with a status, and timeouts, are not retried.
+ */
+async function apiGet(path, query, opts) {
+  try {
+    return await api.get(path, query, opts);
+  } catch (error) {
+    if (error?.code !== ERROR_CODES.NETWORK) throw error;
+    return api.get(path, query, opts);
+  }
+}
+
 async function fetchAll(path, params, lang) {
   const out = [];
   for (let page = 1; page <= 50; page += 1) {
-    const res = await api.get(path, { ...params, page, per_page: 100 }, inLang(lang));
+    const res = await apiGet(path, { ...params, page, per_page: 100 }, inLang(lang));
     const rows = rowsOf(res);
     out.push(...rows);
     if (!rows.length || page >= lastPageOf(res)) break;
@@ -34,7 +47,7 @@ async function fetchAll(path, params, lang) {
   return out;
 }
 
-const getData = async (path, query, lang) => unwrap(await api.get(path, query, lang ? inLang(lang) : undefined));
+const getData = async (path, query, lang) => unwrap(await apiGet(path, query, lang ? inLang(lang) : undefined));
 
 /** Small time-based cache: the home page, the catalog and the sitemap all need the same product list. */
 const cache = new Map();
@@ -117,11 +130,17 @@ function fromListRow(ar, en) {
   };
 }
 
-function mapVariant(v, productStock) {
+/**
+ * `tracked`: some pack of the product reports a stock above zero. The public answer gives `stock: 0` for the packs of EVERY product,
+ * including products the dashboard holds stock for (their stock is kept on the product, which the public answer does not expose;
+ * checked on the live server, the checkout then sells them). So a 0 on all packs means "unknown" and the pack counts as available;
+ * the checkout answers 422 when there is really no stock. Only when a pack reports a positive stock are the numbers trusted.
+ */
+function mapVariant(v, productStock, tracked = false) {
   const base = Number(v.base_price) || 0;
   const effective = round2(v.effective_price ?? base);
   const discounted = effective > 0 && effective < base;
-  const stock = v.stock === null || v.stock === undefined ? productStock : Number(v.stock);
+  const stock = tracked ? Number(v.stock) || 0 : productStock;
   return {
     id: v.id,
     size_name: weightLabel(v.weight, v.weight_unit, 'ar'),
@@ -140,7 +159,8 @@ function fromDetail(arData, enData) {
   const en = enData?.product || ar;
   const purchasable = ar.is_purchasable !== false && ar.availability !== 'unavailable';
   const productStock = purchasable ? (ar.stock === null || ar.stock === undefined ? 99 : Number(ar.stock)) : 0;
-  const variants = (ar.variants || []).map((v) => mapVariant(v, productStock)).sort((a, b) => (a.sale_price ?? a.price) - (b.sale_price ?? b.price));
+  const tracked = (ar.variants || []).some((v) => Number(v.stock) > 0);
+  const variants = (ar.variants || []).map((v) => mapVariant(v, productStock, tracked)).sort((a, b) => (a.sale_price ?? a.price) - (b.sale_price ?? b.price));
   const main = variants.find((v) => v.is_default) || variants[0];
   const category = (ar.categories || [])[0];
   const enCategory = (en.categories || []).find((c) => c.id === category?.id) || category;
@@ -166,12 +186,39 @@ function fromDetail(arData, enData) {
 }
 
 // ------------------------------------------------------------------------------------------------ catalog
+/**
+ * The list answer (`GET /client/products`) has two gaps (checked on the live server): its `image` is always the default
+ * placeholder (the pictures uploaded in the dashboard exist only in the product's `gallery`), and it carries no stock (every
+ * row is `is_purchasable: true`, so the cards would offer "Add to cart" while the product page says "Out of stock").
+ * Both come from the detail answer, which the product page already uses: read it for each product, a few at a time.
+ */
+async function withDetails(products) {
+  const queue = [...products];
+  // One slow answer (~0.7 s, and the server does not speed up under parallel load) per product: a few at a time and kept for
+  // five minutes (the stock on a card can lag a little: the product page, the cart and the checkout use the real stock).
+  const detail = (id) => cached(`detail-ar:${id}`, 300_000, () => getData(`/client/products/${id}`, undefined, 'ar'));
+  const workers = Array.from({ length: 8 }, async () => {
+    while (queue.length) {
+      const p = queue.shift();
+      try {
+        const { product } = fromDetail(await detail(p.id), null);
+        if (product.featured_image) p.featured_image = product.featured_image;
+        p.stock_quantity = product.stock_quantity;
+      } catch {
+        /* keep the list values for this product */
+      }
+    }
+  });
+  await Promise.all(workers);
+  return products;
+}
+
 /** Every published product (ar + en merged) and the categories derived from them (or from /client/departments). */
 async function loadBase() {
-  return cached('base', CATALOG_TTL, async () => {
+  return cached('base', 120_000, async () => {
     const [arRows, enRows] = await Promise.all([fetchAll('/client/products', {}, 'ar'), fetchAll('/client/products', {}, 'en')]);
     const enById = new Map(enRows.map((r) => [r.id, r]));
-    const products = arRows.map((r) => fromListRow(r, enById.get(r.id)));
+    const products = await withDetails(arRows.map((r) => fromListRow(r, enById.get(r.id))));
     return { products, categories: await loadCategories(products) };
   });
 }

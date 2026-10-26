@@ -13,12 +13,12 @@ import { FormField, Flash } from '@/components/ui/FormField';
 import { authService } from '@/services';
 import { config } from '@/lib/config';
 import AuthShell, { DemoNotice, PasswordInput, SocialButtons } from './AuthShell';
+import PhoneCodeSelect, { DEFAULT_PHONE_CODE, PHONE_CODES } from './PhoneCodeSelect';
 
 export const PENDING_PHONE_KEY = 'tamrna.web.pending_phone';
 
-/** Country codes offered next to the mobile number. Saudi Arabia is selected by default; the number itself is validated as a Saudi mobile. */
-export const PHONE_CODES = [['966', '🇸🇦 +966']];
-const DEFAULT_PHONE_CODE = PHONE_CODES[0][0];
+/** Country codes offered next to the mobile number (see PhoneCodeSelect). Saudi Arabia is selected by default; the number itself is validated as a Saudi mobile. */
+export { PHONE_CODES };
 
 export default function RegisterForm() {
   const { locale, tr } = useLocale();
@@ -84,11 +84,7 @@ export default function RegisterForm() {
 
           <FormField id="auth-phone" label={tr('رقم الجوال', 'Mobile number')} required error={errors.phone?.message}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }} dir="ltr">
-              <select className="input select" aria-label={tr('رمز الدولة', 'Country code')} style={{ flex: '0 0 auto', width: 'auto', minWidth: 112 }} {...register('phone_code')}>
-                {PHONE_CODES.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+              <PhoneCodeSelect registration={register('phone_code')} />
               <div className="auth-input-wrap" style={{ flex: 1 }}>{icon('phone')}<input id="auth-phone" type="tel" dir="ltr" inputMode="tel" autoComplete="tel" className="input" placeholder="05xxxxxxxx" maxLength={20} aria-invalid={errors.phone ? 'true' : undefined} {...register('phone')} /></div>
             </div>
           </FormField>

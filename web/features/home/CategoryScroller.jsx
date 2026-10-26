@@ -37,7 +37,16 @@ export default function CategoryScroller({ categories }) {
           return (
             <Link className="category-card category-card--portrait" href={`/catalog?cat=${cat.slug}`} key={cat.id}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset(cat.image || 'assets/images/home/ajwa.webp')} alt={name} loading="lazy" />
+              {/* A picture the server refuses (403 / 404) falls back to the default one instead of a broken icon. */}
+              <img
+                src={asset(cat.image || 'assets/images/home/ajwa.webp')}
+                alt={name}
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = asset('assets/images/home/ajwa.webp');
+                }}
+              />
               <div>
                 <span>
                   <h3>{name}</h3>

@@ -136,7 +136,15 @@ export default function CatalogView({ products, categories, bounds, params }) {
             <Link key={c.id} href={catUrl(c.slug)} className={active ? 'is-active' : ''} aria-current={active ? 'page' : undefined}>
               <span className="category-tab-icon">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={asset(c.image || 'assets/images/home/ajwa.webp')} alt="" loading="lazy" />
+                <img
+                  src={asset(c.image || 'assets/images/home/ajwa.webp')}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = asset('assets/images/home/ajwa.webp');
+                  }}
+                />
               </span>
               <span>{pickLang(c, 'name', locale)}</span>
             </Link>

@@ -1,6 +1,5 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
-import { ApiError, ERROR_CODES } from '@tamrna/shared/api';
 import { toFormData, unwrap } from './helpers';
 import { fetchAllBilingual, isOn, listFilters, mediaOf, tx, uploadMedia, withFormErrors } from './tamrna';
 
@@ -75,21 +74,10 @@ async function bannerBody(v) {
 export const createBanner = (v) =>
   withFormErrors(bannerBody(v).then((body) => api.post(e.banners.list, toFormData(body)).then((r) => unwrap(r))), BANNER_ERRORS);
 // Laravel cannot read multipart bodies on PUT: send POST with _method=PUT.
-// The backend rejects an update without `image` (422) and DELETES the current image when its own id is sent back
-// (checked on the live server), so an edit must come with a new file; fail here instead of silently losing the image.
+// Checked on the live server: an update WITHOUT `image` keeps the current picture (200), while sending the current image's own
+// id DELETES it. So the picture is sent only when a new file was chosen (`bannerBody` uploads it and sends the new id).
 export const updateBanner = (id, v) =>
-  withFormErrors(
-    (async () => {
-      if (!(v.image_file instanceof File)) {
-        throw new ApiError({
-          status: 422,
-          code: ERROR_CODES.VALIDATION,
-          message: 'Image required',
-          errors: { image_file: ['اختر صورة جديدة للحفظ (الباك اند يتطلب صورة عند التعديل) / Choose a new image to save (the backend requires one on update)'] },
-        });
-      }
-      return bannerBody(v);
-    })().then((body) => api.post(e.banners.item(id), toFormData({ ...body, _method: 'PUT' })).then((r) => unwrap(r))), BANNER_ERRORS);
+  withFormErrors(bannerBody(v).then((body) => api.post(e.banners.item(id), toFormData({ ...body, _method: 'PUT' })).then((r) => unwrap(r))), BANNER_ERRORS);
 export const deleteBanner = async (id) => api.delete(e.banners.item(id));
 export const toggleBanner = async (id) => unwrap(await api.post(e.bannerToggle(id)));
 /** The backend sorts with { order[id]: position }: swap the slide with its neighbour and send the whole order. */

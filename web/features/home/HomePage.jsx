@@ -78,6 +78,8 @@ export default function HomePage({ data, text }) {
   let featuresSection = null;
   const bodySections = [];
   homeSections.forEach((sec) => {
+    // The "pre-order harvest" banner is not shown on the home page (pre-order products stay in the catalog filter).
+    if (sec.section_key === 'preorder') return;
     if (sec.section_key === 'hero') {
       if (banners.length) heroSection = sec;
       return;

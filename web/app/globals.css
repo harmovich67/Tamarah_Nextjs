@@ -46,3 +46,27 @@
   object-fit: cover;
   border-radius: 50%;
 }
+
+/* Sign-in / registration: the country code chip in front of the mobile number. */
+.auth-phone-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.auth-phone-row .auth-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.input.select.auth-code-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 118px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #17513b;
+  background-color: #f3ead8;
+  border-color: #c9a56a;
+}
+.input.select.auth-code-select:focus {
+  border-color: #17513b;
+}

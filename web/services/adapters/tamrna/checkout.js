@@ -127,13 +127,38 @@ export async function placeOrder(input) {
  * `unavailable_items`): take those lines out so the next try goes through, and say so.
  */
 async function dropUnavailable(error) {
-  const stale = error?.data?.data?.unavailable_items;
-  if (!Array.isArray(stale) || !stale.length) return;
-  await Promise.all(stale.map((i) => api.delete(`/client/cart/items/${i.item_id}`).catch(() => null)));
-  error.message = t(
-    'تمت إزالة منتجات لم تعد متوفرة من سلتك. راجع السلة ثم أكمل الطلب مرة أخرى.',
-    'Products that are no longer available were removed from your cart. Check your cart and place the order again.',
-  );
+  const lines = error?.data?.data?.unavailable_items;
+  if (!Array.isArray(lines) || !lines.length) return;
+  // A line with quantities (`requested_quantity` / `available_quantity`) is a stock shortage: the product exists, so the line
+  // stays in the cart and the customer is told what is available. A line without them belongs to a product that is gone: the
+  // cart answer hides it but the checkout refuses it, so it is removed.
+  const gone = lines.filter((i) => i.requested_quantity === undefined && i.available_quantity === undefined);
+  await Promise.all(gone.map((i) => api.delete(`/client/cart/items/${i.item_id}`).catch(() => null)));
+  const short = lines.filter((i) => !gone.includes(i));
+  // "250.0000 g" -> "250 جرام"
+  const weightOf = (raw) => {
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return '';
+    const unit = /kg/i.test(raw) ? t('كجم', 'kg') : /(^|\s)t$/i.test(String(raw).trim()) ? t('طن', 't') : t('جرام', 'g');
+    return `${n} ${unit}`;
+  };
+  const named = (i) => [i.product_name, weightOf(i.variant_weight) && `(${weightOf(i.variant_weight)})`].filter(Boolean).join(' ');
+  const parts = [];
+  if (short.length) {
+    parts.push(
+      short
+        .map((i) => {
+          const left = Number(i.available_quantity);
+          if (!Number.isFinite(left)) return `${named(i)}: ${i.reason || t('الكمية غير متوفرة', 'not available in this quantity')}`;
+          return left > 0
+            ? `${named(i)}: ${t(`المتاح ${left} فقط والمطلوب ${i.requested_quantity}`, `only ${left} available, ${i.requested_quantity} requested`)}`
+            : `${named(i)}: ${t('غير متوفر حالياً', 'currently out of stock')}`;
+        })
+        .join(t('، ', ', ')),
+    );
+  }
+  if (gone.length) parts.push(t('تمت إزالة منتجات لم تعد متوفرة من سلتك.', 'Products that are no longer available were removed from your cart.'));
+  error.message = `${parts.join(' ')} ${t('راجع السلة ثم أكمل الطلب.', 'Review your cart, then place the order again.')}`;
   error.data = { ...error.data, success: false };
 }
 
