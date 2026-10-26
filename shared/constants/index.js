@@ -36,32 +36,64 @@ export const ROLE_LEVEL = Object.freeze({ customer: 0, store_manager: 1, super_a
 export const ORDER_STATUS = Object.freeze({
   PENDING: 'pending',
   PROCESSING: 'processing',
-  SHIPPED: 'shipped',
+  READY: 'ready',
   DELIVERED: 'delivered',
+  COMPLETED: 'completed',
   CANCELLED: 'cancelled',
 });
 
-/** Order stages in the order they happen: an order only moves forward (never back to a stage it has passed). */
-export const ORDER_STATUS_FLOW = Object.freeze(['pending', 'processing', 'shipped', 'delivered']);
+/** Delivery flow (home delivery): pending -> processing -> delivered -> completed */
+export const DELIVERY_FLOW = Object.freeze(['pending', 'processing', 'delivered', 'completed']);
+
+/** Branch pickup flow (in case of branch pickup, delivery status is omitted): pending -> processing -> ready -> completed */
+export const BRANCH_PICKUP_FLOW = Object.freeze(['pending', 'processing', 'ready', 'completed']);
+
+/** Legacy flow alias for backward compatibility */
+export const ORDER_STATUS_FLOW = Object.freeze(['pending', 'processing', 'delivered', 'completed']);
 
 /**
- * The shipping statuses an order in `current` may be set to: the current one, the later stages, and "cancelled" until it is
- * delivered. A delivered or cancelled order is final.
- * @param {string} [current]
- * @returns {string[]}
+ * Returns the exact NEXT status in turn for an order, based on whether it is branch pickup or delivery.
+ * Returns null if the order is already in a final state (completed or cancelled).
  */
-export function allowedOrderStatuses(current = 'pending') {
-  if (current === 'cancelled' || current === 'delivered') return [current];
-  const i = Math.max(0, ORDER_STATUS_FLOW.indexOf(current));
-  return [...ORDER_STATUS_FLOW.slice(i), 'cancelled'];
+export function getNextOrderStatus(current = 'pending', shippingType = 'delivery') {
+  if (current === 'completed' || current === 'cancelled') return null;
+  const isBranch = shippingType === 'branch_pickup' || shippingType === 'branch';
+  const flow = isBranch ? BRANCH_PICKUP_FLOW : DELIVERY_FLOW;
+  const idx = flow.indexOf(current);
+  if (idx === -1 || idx >= flow.length - 1) return null;
+  return flow[idx + 1];
+}
+
+/**
+ * Returns whether an order can be cancelled:
+ * - Allowed in: pending, processing, ready (before it is completed or delivered)
+ * - Disallowed in: completed (final, API returns 400), cancelled (already cancelled)
+ */
+export function canCancelOrder(current = 'pending') {
+  return current === 'pending' || current === 'processing' || current === 'ready';
+}
+
+/**
+ * Allowed statuses for transitions:
+ * Only returns the CURRENT status, the single NEXT status on turn, and 'cancelled' (if cancellable).
+ */
+export function allowedOrderStatuses(current = 'pending', shippingType = 'delivery') {
+  if (current === 'completed' || current === 'cancelled') return [current];
+  const next = getNextOrderStatus(current, shippingType);
+  const result = [current];
+  if (next) result.push(next);
+  if (canCancelOrder(current)) result.push('cancelled');
+  return result;
 }
 
 export const ORDER_STATUS_LABELS = Object.freeze({
   pending: { ar: 'بانتظار التأكيد', en: 'Awaiting confirmation' },
   processing: { ar: 'قيد التجهيز', en: 'Preparing' },
-  shipped: { ar: 'تم الشحن وجاري التوصيل', en: 'Shipped' },
-  delivered: { ar: 'مكتمل / تم التوصيل', en: 'Delivered' },
+  ready: { ar: 'جاهز للاستلام من الفرع', en: 'Ready for pickup' },
+  delivered: { ar: 'تم التوصيل للعميل', en: 'Delivered' },
+  completed: { ar: 'مكتمل', en: 'Completed' },
   cancelled: { ar: 'ملغي', en: 'Cancelled' },
+  shipped: { ar: 'تم التوصيل للعميل', en: 'Delivered' },
 });
 
 export const PAYMENT_STATUS = Object.freeze({ PENDING: 'pending', PAID: 'paid', FAILED: 'failed', REFUNDED: 'refunded' });

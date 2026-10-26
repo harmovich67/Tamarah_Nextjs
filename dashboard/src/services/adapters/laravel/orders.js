@@ -31,23 +31,34 @@ const STATUS_IN = {
   new: 'pending',
   processing: 'processing',
   preparing: 'processing',
-  ready: 'shipped', //       branch pickup: ready to collect
-  delivering: 'shipped',
-  shipped: 'shipped',
-  out_for_delivery: 'shipped',
-  deleveried: 'shipped', //  "deliver" (the backend spells it this way)
-  delivered: 'shipped',
-  completed: 'delivered',
-  complete: 'delivered',
+  ready: 'ready',
+  delivering: 'delivered',
+  shipped: 'delivered',
+  out_for_delivery: 'delivered',
+  deleveried: 'delivered',
+  delivered: 'delivered',
+  completed: 'completed',
+  complete: 'completed',
   canceled: 'cancelled',
   cancelled: 'cancelled',
 };
+
 /**
- * Screen status -> backend action (POST /admin/orders/{id}/<action>). "ready" is refused for delivery orders (400 "available
- * for branch pickup orders only"), "deliver" is the step for them.
+ * Screen status -> backend action (POST /admin/orders/{id}/<action>).
+ * - For branch pickup: pending -> process -> ready -> complete
+ * - For delivery: pending -> process -> deliver -> complete
+ * - Cancel: cancel
  */
-const actionFor = (status, order) =>
-  ({ processing: 'process', shipped: order.shipping_type === 'branch_pickup' ? 'ready' : 'deliver', delivered: 'complete', cancelled: 'cancel' })[status];
+const actionFor = (status, order) => {
+  const isBranch = order?.shipping_type === 'branch_pickup' || order?.delivery_type === 'branch';
+  if (status === 'processing') return 'process';
+  if (status === 'ready') return 'ready';
+  if (status === 'delivered') return isBranch ? 'ready' : 'deliver';
+  if (status === 'shipped') return isBranch ? 'ready' : 'deliver';
+  if (status === 'completed') return 'complete';
+  if (status === 'cancelled') return 'cancel';
+  return undefined;
+};
 
 const shippingStatusOf = (o) => STATUS_IN[String(pick(o, ['status', 'order_status'], 'pending')).toLowerCase()] ?? 'pending';
 
@@ -139,17 +150,19 @@ export async function getOrder(id) {
  * The backend changes the status through one POST per step instead of a status field. `payment_status` cannot be changed
  * from here (the collection has no endpoint), so only `shipping_status` is sent.
  */
-export async function updateOrderStatus({ id, shipping_status }) {
+export async function updateOrderStatus({ id, shipping_status, reason = '' }) {
   const current = await getOrder(id);
   // An order only moves forward: refuse a stage it has already passed (the screen does not offer it, this guards a stale tab).
-  if (shipping_status && shipping_status !== current.order.shipping_status && !allowedOrderStatuses(current.order.shipping_status).includes(shipping_status)) {
-    const message = 'لا يمكن الرجوع إلى مرحلة سابقة أو تغيير طلب في حالته النهائية / An order cannot go back to an earlier stage or change once final';
+  const isAllowed = allowedOrderStatuses(current.order.shipping_status, current.order.shipping_type).includes(shipping_status);
+  if (shipping_status && shipping_status !== current.order.shipping_status && !isAllowed) {
+    const message = 'لا يمكن الانتقال لهذه الحالة أو تغيير طلب في حالته النهائية / Invalid status transition or final order';
     throw new ApiError({ status: 422, code: ERROR_CODES.VALIDATION, message, errors: {}, data: { success: false, message } });
   }
   const action = actionFor(shipping_status, current.order);
   if (action && current.order.shipping_status !== shipping_status) {
+    const body = action === 'cancel' && reason ? { cancellation_reason: reason } : undefined;
     try {
-      await api.post(e.orderAction(id, action));
+      await api.post(e.orderAction(id, action), body);
     } catch (error) {
       // The backend changes the status and then fails (500, missing `order_client_details` table; checked on the live
       // server): keep going when the order did move.

@@ -10,20 +10,23 @@ import { newOrderService, storeService } from '@/services';
 
 export const SHIP_CLASSES = {
   pending: 'bg-slate-100 text-slate-700 border border-slate-200/80',
-  processing: 'bg-amber-50 text-amber-800 border border-amber-200/70',
-  shipped: 'bg-sky-50 text-sky-800 border border-sky-200/70',
-  delivered: 'bg-emerald-50 text-emerald-800 border border-emerald-200/70',
+  processing: 'bg-blue-50 text-blue-800 border border-blue-200/70',
+  ready: 'bg-purple-50 text-purple-800 border border-purple-200/70',
+  delivered: 'bg-amber-50 text-amber-800 border border-amber-200/70',
+  completed: 'bg-emerald-50 text-emerald-800 border border-emerald-200/70',
   cancelled: 'bg-rose-50 text-rose-800 border border-rose-200/70',
 };
 
 export function useShipLabels() {
   const { tr } = useT();
   return {
-    pending: tr('قيد التجهيز', 'Processing'),
-    processing: tr('جاهز للشحن', 'Ready to ship'),
-    shipped: tr('تم الشحن', 'Shipped'),
-    delivered: tr('تم التوصيل', 'Delivered'),
+    pending: tr('بانتظار التأكيد', 'Awaiting confirmation'),
+    processing: tr('قيد التجهيز', 'Preparing'),
+    ready: tr('جاهز للاستلام من الفرع', 'Ready for pickup'),
+    delivered: tr('تم التوصيل للعميل', 'Delivered'),
+    completed: tr('مكتمل', 'Completed'),
     cancelled: tr('ملغي', 'Cancelled'),
+    shipped: tr('تم التوصيل للعميل', 'Delivered'),
   };
 }
 
@@ -105,11 +108,17 @@ export default function OrdersPage() {
     },
     {
       key: 'shipping',
-      header: tr('حالة الشحن', 'Shipping Status'),
+      header: tr('حالة الطلب والشحن', 'Order & Shipping Status'),
       align: 'center',
       cell: (o) => {
         const s = o.shipping_status || 'pending';
-        return <span className={cx('inline-flex text-[11px] font-black px-2.5 py-0.5 rounded-lg', SHIP_CLASSES[s] || SHIP_CLASSES.pending)}>{labels[s] || s}</span>;
+        const isBranch = o.shipping_type === 'branch_pickup' || o.delivery_type === 'branch';
+        const label = s === 'ready'
+          ? tr('جاهز للاستلام (فرع)', 'Ready for pickup')
+          : s === 'processing' && isBranch
+          ? tr('تجهيز بالفرع', 'Preparing (Branch)')
+          : (labels[s] || s);
+        return <span className={cx('inline-flex text-[11px] font-black px-2.5 py-0.5 rounded-lg border', SHIP_CLASSES[s] || SHIP_CLASSES.pending)}>{label}</span>;
       },
     },
     {
