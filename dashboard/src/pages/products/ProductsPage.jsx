@@ -18,9 +18,14 @@ export default function ProductsPage() {
   const { can } = usePermissions();
   const [cat, setCat] = useQueryParam('cat', '');
   const [search, setSearch] = useQueryParam('q', '');
+  const [active, setActive] = useQueryParam('active', ''); // '' | '1' | '0' (the backend filters[is_active]; laravel mode only)
   const [toDelete, setToDelete] = useState(null);
+  const isLaravel = config.apiMode === 'laravel';
 
-  const { data: products = [], isLoading, error, refetch } = useQuery({ queryKey: ['products', { cat }], queryFn: () => storeService.listProducts({ cat }) });
+  const { data: products = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['products', { cat, active }],
+    queryFn: () => storeService.listProducts({ cat, ...(isLaravel && active !== '' ? { is_active: active } : {}) }),
+  });
   const { data: options } = useQuery({ queryKey: ['product-options'], queryFn: () => storeService.listProductFormOptions() });
 
   const remove = useAdminMutation((id) => storeService.deleteProduct(id), {
@@ -49,6 +54,7 @@ export default function ProductsPage() {
             </a>
             {p.badge ? <span className="inline-block text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200/60 px-2 py-0.5 rounded-md mt-0.5">{p.badge}</span> : null}
             {p.status !== 'published' && <span className="inline-block text-[10px] font-bold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md mt-0.5 ms-1">{tr('مسودة', 'Draft')}</span>}
+            {p.is_active === false && <span className="inline-block text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-md mt-0.5 ms-1">{tr('متوقف', 'Inactive')}</span>}
           </div>
         </div>
       ),
@@ -151,9 +157,16 @@ export default function ProductsPage() {
             <SelectField className="w-full sm:w-56 [&_select]:text-xs [&_select]:py-2" value={cat} onChange={(e) => setCat(e.target.value)} aria-label={t('admin_col_category')}>
               <option value="">{tr('كل الأقسام', 'All categories')}</option>
               {(options?.categories || []).map((c) => (
-                <option key={c.id} value={c.slug}>{locale === 'en' && c.name_en ? c.name_en : c.name_ar}</option>
+                <option key={c.id} value={String(c.id)}>{locale === 'en' && c.name_en ? c.name_en : c.name_ar}</option>
               ))}
             </SelectField>
+            {isLaravel ? (
+              <SelectField className="w-full sm:w-44 [&_select]:text-xs [&_select]:py-2" value={active} onChange={(e) => setActive(e.target.value)} aria-label={tr('الحالة', 'Status')}>
+                <option value="">{tr('كل الحالات', 'All statuses')}</option>
+                <option value="1">{tr('فعّال', 'Active')}</option>
+                <option value="0">{tr('متوقف', 'Inactive')}</option>
+              </SelectField>
+            ) : null}
           </>
         }
       />

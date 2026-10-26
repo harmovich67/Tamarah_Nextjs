@@ -1,7 +1,7 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { toFormData, unwrap } from './helpers';
-import { fetchAll, fetchAllBilingual, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
+import { fetchAll, fetchAllBilingual, fetchPage, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
 
 /**
  * Laravel adapter for the store-management domain (same function names / shapes as adapters/mock/store.js).
@@ -34,6 +34,15 @@ function toCategory(c) {
 }
 
 export const listCategories = async (filters) => (await fetchAllBilingual(e.categories.list, listFilters(filters))).map(toCategory);
+/**
+ * One page of the categories grid, paged / searched / filtered by the backend in ONE request (`page`, `per_page`, `search`,
+ * `filters[is_active]`). The list answers `{ id, name, sort_order, is_active, image, parent, children_count }` in the current
+ * language only (no slug, no product count): the edit form reads the full record.
+ */
+export async function listCategoriesPage({ page = 1, per_page = 12, search, is_active } = {}) {
+  const { rows, ...paging } = await fetchPage(e.categories.list, { ...listFilters({ search, is_active }), page, per_page });
+  return { rows: rows.map(toCategory), ...paging };
+}
 export const getCategory = async (id) => toCategory(unwrap(await api.get(e.categories.item(id))));
 
 async function categoryBody(values) {
@@ -164,13 +173,17 @@ function toProductRow(p, categories) {
   };
 }
 
-/** @param {{ cat?: string, search?: string, is_active?: boolean }} [params] cat = category slug or id; search / is_active are sent to the backend */
+/**
+ * @param {{ cat?: string, search?: string, is_active?: boolean | 0 | 1 }} [params] cat = category slug or id; the backend filters
+ *   by it (`filters[category_id]`) and by `filters[is_active]` / `search` (checked on the live server)
+ */
 export async function listProducts({ cat, ...filters } = {}) {
-  const [products, categories] = await Promise.all([fetchAllBilingual(e.products.list, listFilters(filters)), listCategories()]);
-  const rows = products.map((p) => toProductRow(p, categories));
+  const categories = await listCategories();
   const wanted = cat ? categories.find((c) => c.slug === cat || String(c.id) === String(cat)) : null;
-  const match = (r) => wanted && (r.category_ids.includes(wanted.id) || r.category_names.includes(wanted.name_ar) || r.category_names.includes(wanted.name_en));
-  return (cat ? rows.filter(match) : rows).sort((x, y) => y.id - x.id);
+  if (cat && !wanted) return []; // a category that does not exist has no products
+  const params = listFilters({ ...filters, filters: { ...filters.filters, ...(wanted ? { category_id: wanted.id } : {}) } });
+  const products = await fetchAllBilingual(e.products.list, params);
+  return products.map((p) => toProductRow(p, categories)).sort((x, y) => y.id - x.id);
 }
 
 export async function getProduct(id) {

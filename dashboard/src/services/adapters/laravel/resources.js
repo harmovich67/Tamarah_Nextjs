@@ -228,7 +228,6 @@ export const resources = {
     fields: [
       { name: 'country_id' },
       { name: 'name', kind: 'bilingual' },
-      { name: 'is_active', kind: 'bool' },
     ],
     // Cities answer `status` (1 / 0) instead of `is_active`, plus `has_private_delivery` (checked on the live server).
     toRow: (row, raw) => ({ ...row, is_active: raw.is_active === undefined ? isOn(raw.status ?? 1) : isOn(raw.is_active), private_delivery: isOn(raw.has_private_delivery) }),

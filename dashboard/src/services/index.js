@@ -52,3 +52,6 @@ export const systemService = pick('system');
 // Simple admin resources that exist only in the Tamrna backend (gift cards, features, branches, cities, clients, reviews...).
 // Their screens and menu entries are shown in laravel mode only.
 export const resourceService = config.apiMode === 'laravel' ? laravel.resources : null;
+
+// An order placed by the admin for a customer (the admin cart + checkout of the backend): laravel mode only.
+export const newOrderService = config.apiMode === 'laravel' ? laravel.newOrder : null;

@@ -7,5 +7,6 @@ import * as cms from './cms';
 import * as home from './home';
 import * as system from './system';
 import { resources } from './resources';
+import * as newOrder from './newOrder';
 
-export { auth, store, commerce, settings, access, cms, home, system, resources };
+export { auth, store, commerce, settings, access, cms, home, system, resources, newOrder };

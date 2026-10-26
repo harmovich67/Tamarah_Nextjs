@@ -180,6 +180,14 @@ export async function listCategories() {
   return db.all('categories').slice().sort((a, b) => a.id - b.id).map((c) => ({ ...c, products_count: db.where('products', (p) => p.category_id === c.id).length }));
 }
 
+/** Same shape as the laravel adapter's `listCategoriesPage` (demo data paged in the browser). */
+export async function listCategoriesPage({ page = 1, per_page = 12, search = '' } = {}) {
+  const all = await listCategories();
+  const term = String(search).trim().toLowerCase();
+  const filtered = all.filter((c) => !term || `${c.name_ar} ${c.name_en} ${c.slug}`.toLowerCase().includes(term));
+  return { rows: filtered.slice((page - 1) * per_page, page * per_page), page, lastPage: Math.max(1, Math.ceil(filtered.length / per_page)), total: filtered.length, perPage: per_page };
+}
+
 export async function getCategory(id) {
   await latency(80);
   requireRole('store_manager');

@@ -37,7 +37,7 @@ export default function OrderSuccess({ orderNumber }) {
 
           <dl>
             <div><dt>{tr('رقم الطلب', 'Order #')}</dt><dd dir="ltr">{order.order_number}</dd></div>
-            <div><dt>{tr('تاريخ الطلب', 'Order date')}</dt><dd>{String(order.created_at || '').slice(0, 10)}</dd></div>
+            {order.created_at ? <div><dt>{tr('تاريخ الطلب', 'Order date')}</dt><dd>{String(order.created_at).slice(0, 10)}</dd></div> : null}
             <div><dt>{tr('طريقة الدفع', 'Payment method')}</dt><dd>{String(order.payment_method || '').toUpperCase()}</dd></div>
             <div><dt>{tr('حالة الطلب', 'Order status')}</dt><dd>{tr('جاري التجهيز والشحن المبرد', 'Processing & cold shipping')}</dd></div>
           </dl>

@@ -1,0 +1,91 @@
+/*
+ * Print view of the order confirmation / order details (the "Print invoice" button): only the order itself goes to the
+ * paper. Without this the sticky header, the announcement bar, the footer and the drawers were printed in the middle of
+ * the page and the card was split over three landscape sheets.
+ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  .announcement-bar,
+  .site-header,
+  .site-footer,
+  .skip-link,
+  .dialog,
+  .drawer,
+  .cart-feedback,
+  .checkout-success-actions,
+  .account-actions,
+  .account-nav,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  html,
+  body,
+  .storefront-shell {
+    background: #fff !important;
+  }
+
+  main,
+  .commerce-page {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+
+  .checkout-success {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  .checkout-success > .container {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .checkout-success-card,
+  .order-details-card,
+  .account-card {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 8mm !important;
+    padding: 6mm !important;
+    box-shadow: none !important;
+    border: 1px solid #cfc3ad !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .checkout-success-card h1 {
+    font-size: 22px !important;
+  }
+
+  .checkout-success-icon {
+    display: none !important;
+  }
+
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Scroll-reveal hides what has not been scrolled into view yet: on paper everything must show. */
+  html.js-reveal .reveal,
+  html.js-reveal .reveal:not(.is-revealed) {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+    transition: none !important;
+    animation: none !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

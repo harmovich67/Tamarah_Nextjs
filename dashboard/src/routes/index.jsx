@@ -25,6 +25,7 @@ const Categories = page(() => import('@/pages/Categories'));
 const Warehouses = page(() => import('@/pages/Warehouses'));
 const Orders = page(() => import('@/pages/orders/OrdersPage'));
 const OrderDetail = page(() => import('@/pages/orders/OrderDetailPage'));
+const NewOrder = page(() => import('@/pages/orders/NewOrderPage'));
 const Coupons = page(() => import('@/pages/Coupons'));
 const ShippingZones = page(() => import('@/pages/ShippingZones'));
 const PaymentSettings = page(() => import('@/pages/settings/PaymentSettings'));
@@ -79,6 +80,7 @@ export const router = createBrowserRouter(
           { path: 'categories', element: guard('categories.view', <Categories />) },
           { path: 'warehouses', element: guard('warehouses.view', <Warehouses />) },
           { path: 'orders', element: guard('orders.view', <Orders />) },
+          ...(config.apiMode === 'laravel' ? [{ path: 'orders/new', element: guard('orders.update', <NewOrder />) }] : []),
           { path: 'orders/:id', element: guard('orders.view', <OrderDetail />) },
           { path: 'coupons', element: guard('coupons.view', <Coupons />) },
           { path: 'shipping-zones', element: guard('shipping.view', <ShippingZones />) },

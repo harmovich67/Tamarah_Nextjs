@@ -104,6 +104,18 @@ export async function fetchAll(path, params = {}, lang) {
 }
 
 /**
+ * ONE page of an admin list (one request, in the current admin language) with the paging meta of the backend
+ * (`meta: { current_page, last_page, per_page, total }`, checked on the live server). Used by the screens that page on the server.
+ * @returns {Promise<{ rows: any[], page: number, lastPage: number, total: number, perPage: number }>}
+ */
+export async function fetchPage(path, params = {}, lang) {
+  const res = await api.get(path, params, lang ? { headers: { 'Accept-Language': lang } } : undefined);
+  const rows = rowsOf(res);
+  const meta = res?.meta ?? res?.data?.meta ?? {};
+  return { rows, page: meta.current_page ?? params.page ?? 1, lastPage: meta.last_page ?? 1, total: meta.total ?? rows.length, perPage: meta.per_page ?? params.per_page ?? rows.length };
+}
+
+/**
  * List endpoints return `name` / `categories` in the Accept-Language language only ("ar,en" is read as "ar"), so the
  * list is fetched once per language and merged by id. Each row gets `ar: { name }` / `en: { name }` (what `tx` reads) plus
  * `categories_ar` / `categories_en` when the row lists category names (`ar` / `en` are the full row in that language).

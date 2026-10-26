@@ -203,7 +203,7 @@ export async function getOrder(orderNumber) {
   if (!found) throw notFound(t('الطلب غير موجود', 'Order not found'));
   const placed = !found.items.length ? placedOrderLines(found.order) : null;
   const items = placed?.items ?? found.items;
-  const order = placed ? { ...placed.order, ...found.order, items_count: items.length, products_snippet: placed.order.products_snippet, shipping_address: placed.order.shipping_address, city: placed.order.city } : found.order;
+  const order = placed ? { ...placed.order, ...found.order, created_at: found.order.created_at || placed.order.created_at, items_count: items.length, products_snippet: placed.order.products_snippet, shipping_address: placed.order.shipping_address, city: placed.order.city } : found.order;
   // The backend has no customer-side cancel endpoint.
   return { order, items, settings: { allow_customer_order_cancellation: false } };
 }

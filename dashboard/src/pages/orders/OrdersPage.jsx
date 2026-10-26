@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { numberFormat } from '@tamrna/shared/utils';
 import { ORDER_STATUS } from '@tamrna/shared/constants';
-import { DataTable, Icon, SearchInput, SelectField, cx } from '@/components/ui';
+import { DataTable, Icon, LinkButton, SearchInput, SelectField, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { useQueryParam } from '@/hooks/useQueryState';
-import { storeService } from '@/services';
+import { usePermissions } from '@/hooks/usePermissions';
+import { newOrderService, storeService } from '@/services';
 
 export const SHIP_CLASSES = {
   pending: 'bg-slate-100 text-slate-700 border border-slate-200/80',
@@ -30,6 +31,7 @@ export function useShipLabels() {
 export default function OrdersPage() {
   const { t, tr, currency } = useT();
   const labels = useShipLabels();
+  const { can } = usePermissions();
   const [search, setSearch] = useQueryParam('q', '');
   const [ship, setShip] = useQueryParam('shipping', '');
   const [pay, setPay] = useQueryParam('payment', '');
@@ -135,9 +137,12 @@ export default function OrdersPage() {
             <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5">{t('admin_orders_sub')}</p>
           </div>
         </div>
-        <span className="px-3.5 py-1.5 bg-gold-50 border border-gold-200/60 rounded-xl text-xs font-black text-gold-800">
-          {tr('إجمالي الطلبات: ', 'Total Orders: ')}{orders.length}
-        </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="px-3.5 py-1.5 bg-gold-50 border border-gold-200/60 rounded-xl text-xs font-black text-gold-800">
+            {tr('إجمالي الطلبات: ', 'Total Orders: ')}{orders.length}
+          </span>
+          {newOrderService && can('orders.update') ? <LinkButton to="/orders/new" icon="plus-circle">{tr('طلب جديد', 'New order')}</LinkButton> : null}
+        </div>
       </div>
 
       <DataTable

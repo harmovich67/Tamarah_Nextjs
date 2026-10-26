@@ -194,7 +194,7 @@ export default function ProfilePage() {
                     <details key={ro.id}>
                       <summary>
                         <b dir="ltr">#{ro.order_number}</b>
-                        <span>{String(ro.created_at).slice(0, 10)}</span>
+                        {ro.created_at ? <span>{String(ro.created_at).slice(0, 10)}</span> : null}
                         <span>{ro.items_count} {tr('منتج', 'items')}</span>
                         <strong>{numberFormat(ro.total, 2)} {currency}</strong>
                         <em data-status={statusKey}>{ro.shipping_status || tr('الطلب مؤكد', 'Order confirmed')}</em>

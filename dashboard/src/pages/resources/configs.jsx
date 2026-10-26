@@ -29,6 +29,7 @@ export const RESOURCE_PAGES = {
     subtitle: ['القيم الجاهزة التي يختار منها العميل عند إهداء بطاقة', 'Preset amounts customers choose from when sending a gift card'],
     searchText: (r) => String(r.amount),
     toggle: true,
+    filter: { name: 'is_active', label: ['الحالة', 'Status'], options: [['1', 'فعّالة|Active'], ['0', 'متوقفة|Stopped']] },
     fields: [
       { name: 'amount', label: ['القيمة (ر.س)', 'Amount (SAR)'], type: 'number', required: true },
       { name: 'sort_order', label: ['الترتيب', 'Sort order'], type: 'number' },
@@ -139,11 +140,13 @@ export const RESOURCE_PAGES = {
     subtitle: ['المدن المتاحة للتوصيل والفروع', 'Cities available for delivery and branches'],
     searchText: (r) => `${r.name_ar} ${r.name_en}`,
     toggle: true,
-    filter: { name: 'is_active', label: ['الحالة', 'Status'], options: [['1', 'فعّال|Active'], ['0', 'متوقف|Stopped']] },
+    // Cities answer and filter by `status` (checked on the live server: `filters[is_active]` is ignored there).
+    filter: { name: 'status', label: ['الحالة', 'Status'], options: [['1', 'فعّال|Active'], ['0', 'متوقف|Stopped']] },
     fields: [
       { name: 'name', label: ['اسم المدينة', 'City name'], type: 'bilingual', required: true },
       { name: 'country_id', label: ['رقم الدولة', 'Country id'], type: 'number', required: true },
-      { name: 'is_active', label: ['فعّالة', 'Active'], type: 'switch' },
+      // No "active" switch here: the backend ignores `is_active` on create / edit (checked on the live server); a city's
+      // status changes only through the switch in the table (`POST /admin/cities/{id}/status`).
     ],
     columns: [
       { key: 'name', header: ['المدينة', 'City'], sortValue: (r) => r.name_ar, cell: (r, { locale }) => <b>{loc(r, 'name', locale)}</b> },

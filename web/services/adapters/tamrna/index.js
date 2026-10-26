@@ -341,7 +341,8 @@ async function homeFeed() {
   }
 }
 
-const truthy = (v) => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').trim().toLowerCase());
+// A number counts as on when positive: `accept_gift_card_amount` is a float on the backend (it used to hold 100).
+const truthy = (v) => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').trim().toLowerCase()) || Number(v) > 0;
 
 /**
  * `GET /general/settings`: public key / value settings of the backend ({ key, value, group, type }). They are exposed under

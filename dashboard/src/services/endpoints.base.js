@@ -31,6 +31,13 @@ export default Object.freeze({
   orders: crud('/admin/orders'), //         OrdersController
   orderAction: (id, action) => `/admin/orders/${id}/${action}`, // POST; action = process | ready | deliver | complete | cancel
 
+  // Tamrna backend: an order placed by the admin for a customer (the admin's own cart, then the admin checkout).
+  adminCart: '/admin/cart', //                      GET
+  adminCartAdd: '/admin/cart/add', //               POST { product_variant_id, quantity }
+  adminCartItem: (id) => `/admin/cart/items/${id}`, // POST { quantity, _method: PUT } / DELETE
+  adminCartClear: '/admin/cart/clear', //           DELETE
+  adminCheckout: '/admin/checkout', //              POST { user_id | name, phone, phone_code, city_id, district, street, ... , delivery_type }
+
   coupons: crud('/admin/coupons'), //       CouponsController
   couponToggle: (id) => `/admin/coupons/${id}/toggle`,
   shippingZones: crud('/admin/shipping-zones'), // ShippingZonesController

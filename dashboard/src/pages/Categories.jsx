@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, CheckField, ConfirmDialog, EmptyState, ErrorState, FileUploader, Icon, Modal, Skeleton, TextAreaField, TextField, cx } from '@/components/ui';
+import { Alert, Button, CheckField, ConfirmDialog, EmptyState, ErrorState, FileUploader, Icon, Modal, Pagination, SearchInput, SelectField, Skeleton, TextAreaField, TextField, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useQueryParam } from '@/hooks/useQueryState';
 import { usePermissions } from '@/hooks/usePermissions';
 import { storeService } from '@/services';
 import { categorySchema } from '@/schemas';
@@ -12,6 +13,7 @@ import { config } from '@/lib/config';
 import { assetSrc } from './products/ProductsPage';
 
 const isLaravel = config.apiMode === 'laravel';
+const PER_PAGE = 12;
 
 function CategoryDialog({ open, category, onClose }) {
   const { tr, locale } = useT();
@@ -89,7 +91,29 @@ function CategoryDialog({ open, category, onClose }) {
 export default function Categories() {
   const { tr, locale } = useT();
   const { can } = usePermissions();
-  const { data = [], isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: () => storeService.listCategories() });
+  const [active, setActive] = useQueryParam('active', ''); // '' | '1' | '0' (the backend filters[is_active]; laravel mode only)
+  const [search, setSearch] = useQueryParam('q', '');
+  const [page, setPage] = useState(1);
+  // The search goes to the backend (`search`): wait for the typing to pause so it is one request, not one per key.
+  const [term, setTerm] = useState(search);
+  useEffect(() => {
+    const id = setTimeout(() => setTerm(search.trim()), 350);
+    return () => clearTimeout(id);
+  }, [search]);
+  useEffect(() => setPage(1), [term, active]);
+
+  // ONE request per page (the backend pages the list: page / per_page / search / filters[is_active]).
+  const { data: result, isLoading, error, refetch } = useQuery({
+    queryKey: ['categories', { page, term, active, locale }],
+    queryFn: () => storeService.listCategoriesPage({ page, per_page: PER_PAGE, search: term, ...(isLaravel && active !== '' ? { is_active: active } : {}) }),
+    placeholderData: (previous) => previous,
+  });
+  const data = useMemo(() => result?.rows ?? [], [result]);
+  const filtering = term !== '' || active !== '';
+  // Deleting the last card of the last page leaves an empty page: step back.
+  useEffect(() => {
+    if (result && page > result.lastPage) setPage(result.lastPage);
+  }, [result, page]);
   const [dialog, setDialog] = useState({ open: false, category: null });
   const toggle = useAdminMutation((id) => storeService.toggleCategory(id), {
     invalidate: [['categories']],
@@ -122,12 +146,23 @@ export default function Categories() {
         )}
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3">
+        <SearchInput value={search} onChange={setSearch} placeholder={tr('ابحث باسم القسم…', 'Search categories…')} className="w-full sm:w-72" />
+        {isLaravel ? (
+          <SelectField className="w-full sm:w-44 [&_select]:text-xs [&_select]:py-2" value={active} onChange={(e) => setActive(e.target.value)} aria-label={tr('الحالة', 'Status')}>
+            <option value="">{tr('كل الحالات', 'All statuses')}</option>
+            <option value="1">{tr('فعّال', 'Active')}</option>
+            <option value="0">{tr('متوقف', 'Inactive')}</option>
+          </SelectField>
+        ) : null}
+      </div>
+
       {error ? (
         <ErrorState title={tr('تعذر تحميل التصنيفات', 'Could not load categories')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />
       ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}</div>
       ) : !data.length ? (
-        <EmptyState icon="tags" title={tr('لا توجد تصنيفات بعد', 'No categories yet')} />
+        <EmptyState icon="tags" title={filtering ? tr('لا توجد تصنيفات مطابقة', 'No matching categories') : tr('لا توجد تصنيفات بعد', 'No categories yet')} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           {data.map((cat) => (
@@ -139,27 +174,36 @@ export default function Categories() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-900 text-base leading-tight truncate">{locale === 'en' && cat.name_en ? cat.name_en : cat.name_ar}</h3>
-                    <p className="text-xs text-amber-600 font-medium tracking-wide mt-0.5 truncate">{locale === 'en' ? cat.name_ar : cat.name_en}</p>
+                    {/* The backend list answers one language only, so there is no second-language line in production. */}
+                    {!isLaravel && <p className="text-xs text-amber-600 font-medium tracking-wide mt-0.5 truncate">{locale === 'en' ? cat.name_ar : cat.name_en}</p>}
                   </div>
                 </div>
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 space-y-2.5 text-xs font-medium text-slate-600">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-normal">{tr('عدد المنتجات النشطة:', 'Active products:')}</span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#0f764a] font-bold text-xs border border-emerald-200/60">{cat.products_count == null ? '—' : `${cat.products_count} ${tr('منتج', 'products')}`}</span>
+                {isLaravel ? (
+                  // The backend list has no slug, icon or product count: only what it returns is shown.
+                  <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex justify-between items-center text-xs font-medium text-slate-600">
+                    <span className="text-slate-400 font-normal">{tr('الترتيب:', 'Order:')}</span>
+                    <span className="font-mono text-slate-700">{cat.sort_order ?? '—'}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-normal">{tr('الرابط الدائم (Slug):', 'Permalink (slug):')}</span>
-                    <span dir="ltr" className="font-mono text-slate-700 text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">{cat.slug || '—'}</span>
+                ) : (
+                  <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 space-y-2.5 text-xs font-medium text-slate-600">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-normal">{tr('عدد المنتجات النشطة:', 'Active products:')}</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#0f764a] font-bold text-xs border border-emerald-200/60">{cat.products_count == null ? '—' : `${cat.products_count} ${tr('منتج', 'products')}`}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-normal">{tr('الرابط الدائم (Slug):', 'Permalink (slug):')}</span>
+                      <span dir="ltr" className="font-mono text-slate-700 text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">{cat.slug || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-normal">{tr('أيقونة العرض:', 'Display icon:')}</span>
+                      <span className="font-mono text-slate-500 text-xs">{cat.icon || 'tag'}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-normal">{tr('أيقونة العرض:', 'Display icon:')}</span>
-                    <span className="font-mono text-slate-500 text-xs">{cat.icon || 'tag'}</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
-                <a href={`${config.storefrontUrl}/catalog?cat=${cat.slug}`} target="_blank" rel="noreferrer" className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-2xs" title={tr('معاينة في المتجر', 'Preview in store')} aria-label={tr('معاينة في المتجر', 'Preview in store')}>
+                <a href={`${config.storefrontUrl}/catalog?cat=${cat.slug || cat.id}`} target="_blank" rel="noreferrer" className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-2xs" title={tr('معاينة في المتجر', 'Preview in store')} aria-label={tr('معاينة في المتجر', 'Preview in store')}>
                   <Icon name="external-link" className="w-3.5 h-3.5" />
                 </a>
                 {isLaravel && can('categories.edit') && (
@@ -183,6 +227,12 @@ export default function Categories() {
           ))}
         </div>
       )}
+
+      {!error && result && result.lastPage > 1 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          <Pagination page={result.page} pageCount={result.lastPage} onPage={setPage} total={result.total} perPage={result.perPage} />
+        </div>
+      ) : null}
 
       <CategoryDialog open={dialog.open} category={dialog.category} onClose={() => setDialog((d) => ({ ...d, open: false }))} />
       <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => remove.mutate(toDelete.id)} loading={remove.isPending} message={tr('هل أنت متأكد من رغبتك في حذف هذا التصنيف؟', 'Are you sure you want to delete this category?')} confirmLabel={tr('حذف', 'Delete')} />

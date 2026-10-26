@@ -142,8 +142,12 @@ async function dropUnavailable(error) {
  * confirmation page of this order.
  */
 function rememberPlacedOrder(order, items) {
+  // The backend sends no date in the checkout answer or in the order list: the moment of placing is the order date.
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const created_at = order.created_at || `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   try {
-    sessionStorage.setItem('tamrna:placed-order', JSON.stringify({ number: order.order_number, id: order.id, order, items }));
+    sessionStorage.setItem('tamrna:placed-order', JSON.stringify({ number: order.order_number, id: order.id, order: { ...order, created_at }, items }));
   } catch {
     /* private mode: the confirmation page shows the totals without the lines */
   }

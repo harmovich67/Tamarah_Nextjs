@@ -11,9 +11,12 @@ import { backendSettings } from '@/services/adapters/laravel/resources';
  * `accept_gift_card_amount` (shows / hides the "Other value" button of the storefront gift card page).
  */
 // The backend's `type` decides the input: a number setting (e.g. `accept_gift_card_amount`, type float) must not become a 1 / 0 switch.
-const isSwitch = (s) => ['boolean', 'bool', 'switch', 'toggle', 'checkbox'].includes(String(s.type).toLowerCase());
+// `accept_gift_card_amount` is stored as a float by the backend but works as an on / off switch (1 / 0): the storefront shows
+// the "Other value" button only when it is on.
+const SWITCH_KEYS = ['accept_gift_card_amount'];
+const isSwitch = (s) => SWITCH_KEYS.includes(s.key) || ['boolean', 'bool', 'switch', 'toggle', 'checkbox'].includes(String(s.type).toLowerCase());
 const isNumber = (s) => ['float', 'double', 'decimal', 'integer', 'int', 'number'].includes(String(s.type).toLowerCase());
-const on = (v) => ['1', 'true', 'yes', 'on'].includes(String(v).trim().toLowerCase());
+const on = (v) => ['1', 'true', 'yes', 'on'].includes(String(v).trim().toLowerCase()) || Number(v) > 0;
 
 export default function StoreSettingsPage() {
   const { tr } = useT();
@@ -55,7 +58,7 @@ export default function StoreSettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {rows.map((s) =>
               isSwitch(s) ? (
-                <SwitchRow key={s.key} label={s.label} hint={s.key} checked={on(values[s.key])} onChange={(v) => setValues((o) => ({ ...o, [s.key]: v ? '1' : '0' }))} />
+                <SwitchRow key={s.key} label={s.label} hint={s.isPublic ? s.key : `${s.key} · ${tr('غير ظاهر للموقع', 'not visible to the storefront')}`} checked={on(values[s.key])} onChange={(v) => setValues((o) => ({ ...o, [s.key]: v ? '1' : '0' }))} />
               ) : (
                 <TextField
                   key={s.key}

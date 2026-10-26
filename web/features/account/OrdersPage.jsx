@@ -94,7 +94,7 @@ export default function OrdersPage() {
                         </div>
                       )}
                       <dl>
-                        <div><dt>{tr('التاريخ', 'Date')}</dt><dd>{String(order.created_at).slice(0, 10)}</dd></div>
+                        {order.created_at ? <div><dt>{tr('التاريخ', 'Date')}</dt><dd>{String(order.created_at).slice(0, 10)}</dd></div> : null}
                         <div><dt>{tr('إجمالي الطلب', 'Order total')}</dt><dd>{numberFormat(order.total, 2)} {currency}</dd></div>
                       </dl>
                       {order.tracking_number ? (
