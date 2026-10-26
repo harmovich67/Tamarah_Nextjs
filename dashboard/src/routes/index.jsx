@@ -5,10 +5,17 @@ import { BACKEND_REDIRECTS } from '@/layouts/navigation';
 import { RequireAuth, RequirePermission } from './guards';
 import { PageLoading } from '@/components/ui';
 import { config } from '@/lib/config';
+import { isStaleChunkError, reloadForNewBuild } from '@/lib/staleChunk';
 
 /** Every screen is a lazy chunk (code splitting); the guards enforce login + permission for UX. */
 const page = (loader) => {
-  const Component = lazy(loader);
+  // A chunk of an older build is gone after a deploy: reload once for the new build (the error screen shows if that fails too).
+  const Component = lazy(() =>
+    loader().catch((error) => {
+      if (isStaleChunkError(error) && reloadForNewBuild()) return new Promise(() => {});
+      throw error;
+    }),
+  );
   return function LazyPage(props) {
     return (
       <Suspense fallback={<PageLoading />}>
