@@ -1,4 +1,5 @@
 import { nowSql, slugify } from '@tamrna/shared/utils';
+import { allowedOrderStatuses } from '@tamrna/shared/constants';
 import { db, latency, fail, requireRole, storeUpload, logActivity } from './db';
 
 /**
@@ -285,6 +286,10 @@ export async function getOrder(id) {
 export async function updateOrderStatus({ id, shipping_status, payment_status }) {
   await latency(250);
   requireRole('store_manager');
+  const before = db.find('orders', id);
+  if (before && shipping_status && shipping_status !== before.shipping_status && !allowedOrderStatuses(before.shipping_status).includes(shipping_status)) {
+    fail('لا يمكن الرجوع إلى مرحلة سابقة أو تغيير طلب في حالته النهائية', 422);
+  }
   const patch = {};
   if (shipping_status) patch.shipping_status = shipping_status;
   if (payment_status) patch.payment_status = payment_status;

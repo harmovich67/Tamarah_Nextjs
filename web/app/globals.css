@@ -24,3 +24,25 @@
   --color-ink: #1d352a;
   --color-danger: #a33228;
 }
+
+/* About page: a picture uploaded in the dashboard replaces the fixed icon of an item (stats, values, numbers). */
+.about-item-image {
+  display: block;
+  object-fit: contain;
+}
+.about-stats .about-item-image {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 2px;
+}
+.about-values article .about-item-image {
+  width: 43px;
+  height: 43px;
+  margin-inline: auto;
+}
+.about-performance li > span .about-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}

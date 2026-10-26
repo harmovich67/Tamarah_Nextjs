@@ -40,6 +40,14 @@ export default function AboutPage({ text, remote = null }) {
   const t = (v) => (v && typeof v === 'object' ? v[locale] ?? v.ar ?? '' : String(v ?? ''));
   const img = (src) => (/^https?:\/\//.test(src) ? src : asset(`assets${src}`));
   const Ic = ({ name, size = 24 }) => <Icon name={ICONS[name] || 'sparkles'} size={size} />;
+  // The picture uploaded in the dashboard for an item wins over the fixed icon; without one the icon stays.
+  const Pic = ({ item, size = 24 }) =>
+    item.image ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img className="about-item-image" src={item.image} alt="" width={size} height={size} loading="lazy" />
+    ) : (
+      <Ic name={item.icon} size={size} />
+    );
   const Arrow = ({ size = 17 }) => <Icon name="arrow-left" size={size} className="directional-arrow" />;
 
   return (
@@ -93,7 +101,7 @@ export default function AboutPage({ text, remote = null }) {
         <section className="container about-stats" aria-label={tr('مؤشرات تمرنا', 'Tamrna indicators')}>
           {c.stats.map((item) => (
             <article key={item.id}>
-              <Ic name={item.icon} />
+              <Pic item={item} />
               <span>{t(item.label)}</span>
               <strong>{t(item.value)}</strong>
             </article>
@@ -123,7 +131,7 @@ export default function AboutPage({ text, remote = null }) {
           <div>
             {c.values.map((item) => (
               <article key={item.id}>
-                <Ic name={item.icon} />
+                <Pic item={item} />
                 <h3>{t(item.title)}</h3>
                 <p>{t(item.description)}</p>
               </article>
@@ -140,7 +148,7 @@ export default function AboutPage({ text, remote = null }) {
           <ol>
             {c.performance.items.map((item, i) => (
               <li key={item.id ?? i}>
-                <span aria-hidden="true"><Ic name={item.icon} /></span>
+                <span aria-hidden="true"><Pic item={item} size={item.image ? 40 : 24} /></span>
                 <b dir="ltr">{item.value}</b>
                 <strong>{t(item.title)}</strong>
                 <small>{t(item.description)}</small>

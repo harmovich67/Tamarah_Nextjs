@@ -1,3 +1,5 @@
+import { ApiError, ERROR_CODES } from '@tamrna/shared/api';
+import { allowedOrderStatuses } from '@tamrna/shared/constants';
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
 import { unwrap } from './helpers';
@@ -139,6 +141,11 @@ export async function getOrder(id) {
  */
 export async function updateOrderStatus({ id, shipping_status }) {
   const current = await getOrder(id);
+  // An order only moves forward: refuse a stage it has already passed (the screen does not offer it, this guards a stale tab).
+  if (shipping_status && shipping_status !== current.order.shipping_status && !allowedOrderStatuses(current.order.shipping_status).includes(shipping_status)) {
+    const message = 'لا يمكن الرجوع إلى مرحلة سابقة أو تغيير طلب في حالته النهائية / An order cannot go back to an earlier stage or change once final';
+    throw new ApiError({ status: 422, code: ERROR_CODES.VALIDATION, message, errors: {}, data: { success: false, message } });
+  }
   const action = actionFor(shipping_status, current.order);
   if (action && current.order.shipping_status !== shipping_status) {
     try {

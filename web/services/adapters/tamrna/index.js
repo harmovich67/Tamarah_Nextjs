@@ -402,16 +402,17 @@ export async function getAbout(lang = 'ar') {
   const commitment = d?.commitment;
   return {
     story: story ? { title: story.title || '', description: story.description || '', image: pictures(story.images)[0] || '' } : null,
-    pillars: active(story?.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
-    stats: active(d?.about_features).map((f) => ({ id: f.id, label: f.title || '', value: f.description || '' })),
-    values: active(d?.principles).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
-    performance: list(d?.numbers).filter((n) => n.is_active !== false).map((n) => ({ id: n.id, value: n.number || '', title: n.title || '', description: n.description || '' })),
+    // `image` is the picture uploaded in the dashboard for the item (empty for the default placeholder): it replaces the fixed icon.
+    pillars: active(story?.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '', image: imageOf(f.image) })),
+    stats: active(d?.about_features).map((f) => ({ id: f.id, label: f.title || '', value: f.description || '', image: imageOf(f.image) })),
+    values: active(d?.principles).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '', image: imageOf(f.image) })),
+    performance: list(d?.numbers).filter((n) => n.is_active !== false).map((n) => ({ id: n.id, value: n.number || '', title: n.title || '', description: n.description || '', image: imageOf(n.image) })),
     sustainability: future
       ? {
           title: future.title || '',
           description: future.description || '',
           image: pictures(future.images)[0] || '',
-          principles: active(future.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '' })),
+          principles: active(future.features).map((f) => ({ id: f.id, title: f.title || '', description: f.description || '', image: imageOf(f.image) })),
         }
       : null,
     quality: commitment ? { title: commitment.title || '', description: commitment.description || '', images: pictures(commitment.images) } : null,

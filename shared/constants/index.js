@@ -41,6 +41,21 @@ export const ORDER_STATUS = Object.freeze({
   CANCELLED: 'cancelled',
 });
 
+/** Order stages in the order they happen: an order only moves forward (never back to a stage it has passed). */
+export const ORDER_STATUS_FLOW = Object.freeze(['pending', 'processing', 'shipped', 'delivered']);
+
+/**
+ * The shipping statuses an order in `current` may be set to: the current one, the later stages, and "cancelled" until it is
+ * delivered. A delivered or cancelled order is final.
+ * @param {string} [current]
+ * @returns {string[]}
+ */
+export function allowedOrderStatuses(current = 'pending') {
+  if (current === 'cancelled' || current === 'delivered') return [current];
+  const i = Math.max(0, ORDER_STATUS_FLOW.indexOf(current));
+  return [...ORDER_STATUS_FLOW.slice(i), 'cancelled'];
+}
+
 export const ORDER_STATUS_LABELS = Object.freeze({
   pending: { ar: 'بانتظار التأكيد', en: 'Awaiting confirmation' },
   processing: { ar: 'قيد التجهيز', en: 'Preparing' },

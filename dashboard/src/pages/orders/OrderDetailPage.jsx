@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { numberFormat } from '@tamrna/shared/utils';
+import { allowedOrderStatuses } from '@tamrna/shared/constants';
 import { Button, ConfirmDialog, ErrorState, Icon, PageLoading, SelectField, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
@@ -12,6 +13,14 @@ import { config } from '@/lib/config';
 import { assetSrc } from '../products/ProductsPage';
 
 const realBackend = config.apiMode === 'laravel';
+
+const STATUS_OPTIONS = [
+  ['pending', 'قيد التجهيز بالمستودع', 'Preparing in the warehouse'],
+  ['processing', 'تم تغليف الصندوق وجاهز للشحن', 'Packed and ready to ship'],
+  ['shipped', 'تم التسليم لسيارة التبريد / الشاحن', 'Handed to the cold-chain carrier'],
+  ['delivered', 'تم التوصيل بنجاح للعميل', 'Delivered to the customer'],
+  ['cancelled', 'ملغي', 'Cancelled'],
+];
 
 /** Order detail + status control (resources/views/admin/order_detail.php). */
 export default function OrderDetailPage() {
@@ -45,6 +54,8 @@ export default function OrderDetailPage() {
   if (error) return <ErrorState title={tr('تعذر تحميل الطلب', 'Could not load the order')} onRetry={refetch} retryLabel={tr('إعادة المحاولة', 'Try again')} />;
 
   const { order, items } = data;
+  const allowed = allowedOrderStatuses(order.shipping_status || 'pending');
+  const finalStatus = allowed.length === 1; // delivered or cancelled
   const paid = order.payment_status === 'paid';
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
   const pm = String(order.payment_method || 'cod').toLowerCase();
@@ -208,12 +219,9 @@ export default function OrderDetailPage() {
               </div>
 
               <form onSubmit={handleSubmit((v) => update.mutate(v))} className="space-y-4">
-                <SelectField label={tr('حالة الشحن والتجهيز', 'Shipping & preparation status')} className="[&_label]:text-xs [&_label]:font-black" {...register('shipping_status')}>
-                  <option value="pending">{tr('قيد التجهيز بالمستودع', 'Preparing in the warehouse')}</option>
-                  <option value="processing">{tr('تم تغليف الصندوق وجاهز للشحن', 'Packed and ready to ship')}</option>
-                  <option value="shipped">{tr('تم التسليم لسيارة التبريد / الشاحن', 'Handed to the cold-chain carrier')}</option>
-                  <option value="delivered">{tr('تم التوصيل بنجاح للعميل', 'Delivered to the customer')}</option>
-                  <option value="cancelled">{tr('ملغي', 'Cancelled')}</option>
+                {/* An order only moves forward: the stages it has passed are not offered (a shipped order cannot go back to preparing). */}
+                <SelectField label={tr('حالة الشحن والتجهيز', 'Shipping & preparation status')} className="[&_label]:text-xs [&_label]:font-black" disabled={finalStatus} hint={finalStatus ? tr('الطلب في حالته النهائية ولا يمكن تغييرها.', 'The order is in its final status and cannot be changed.') : tr('الطلب يتقدّم للأمام فقط ولا يمكن الرجوع لمرحلة سابقة.', 'An order only moves forward; it cannot go back to an earlier stage.')} {...register('shipping_status')}>
+                  {STATUS_OPTIONS.filter(([value]) => allowed.includes(value)).map(([value, ar, en]) => <option key={value} value={value}>{tr(ar, en)}</option>)}
                 </SelectField>
                 {/* The Tamrna backend only moves the shipping status (process / ready / deliver / complete / cancel). */}
                 {!realBackend && (
@@ -223,7 +231,7 @@ export default function OrderDetailPage() {
                     <option value="failed">{tr('فشل في السداد', 'Payment failed')}</option>
                   </SelectField>
                 )}
-                <Button type="submit" loading={update.isPending} icon="check" className="w-full justify-center">
+                <Button type="submit" loading={update.isPending} disabled={finalStatus && realBackend} icon="check" className="w-full justify-center">
                   {tr('حفظ التحديثات', 'Save updates')}
                 </Button>
               </form>
