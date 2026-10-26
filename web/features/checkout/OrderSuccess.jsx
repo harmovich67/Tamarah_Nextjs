@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@tamrna/shared/components/Icon';
@@ -9,77 +10,274 @@ import { ErrorState, LoadingState } from '@/components/ui/States';
 import { checkoutService } from '@/services';
 import { asset } from '@/lib/asset';
 
-/** Order confirmation (resources/views/storefront/order_success.php). */
+/**
+ * Premium Luxury Order Confirmation & Receipt (Tamrna Storefront).
+ */
 export default function OrderSuccess({ orderNumber }) {
   const { locale, isRtl, tr, currency } = useLocale();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['order', orderNumber], queryFn: () => checkoutService.getOrder(orderNumber) });
+  const [copied, setCopied] = useState(false);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['order', orderNumber],
+    queryFn: () => checkoutService.getOrder(orderNumber),
+  });
 
   if (isLoading) return <LoadingState />;
   if (isError || !data) return <ErrorState onRetry={refetch} message={tr('الطلب غير موجود', 'Order not found')} />;
   const { order, items } = data;
   const money = (n) => `${numberFormat(n, 2)} ${currency}`;
 
+  const copyOrderNumber = () => {
+    if (!order?.order_number) return;
+    navigator.clipboard?.writeText(order.order_number);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const paymentLabel = (() => {
+    const m = String(order.payment_method || '').toLowerCase();
+    if (m === 'cod' || m.includes('cash') || m.includes('delivery')) return tr('الدفع عند الاستلام', 'Cash on delivery');
+    if (m === 'wallet' || m.includes('wallet')) return tr('رصيد المحفظة', 'Tamrna Wallet');
+    if (m === 'apple_pay' || m.includes('apple')) return 'Apple Pay';
+    if (m === 'credit_card' || m.includes('card') || m.includes('mada')) return tr('بطاقة مدى / فيزا', 'Card / Mada');
+    return String(order.payment_method || tr('الدفع عند الاستلام', 'Cash on delivery')).toUpperCase();
+  })();
+
   return (
-    <section className="commerce-page checkout-success">
+    <section className="commerce-page checkout-success order-success-section">
       <div className="container">
-        <div className="checkout-success-card">
-          <div className="checkout-success-icon"><Icon name="check" size={42} /></div>
-          <p className="commerce-kicker" style={{ justifyContent: 'center' }}>
-            <Icon name="sparkles" size={14} />
-            {tr('تم استلام وتأكيد طلبك بنجاح', 'Order received & confirmed')}
-          </p>
-          <h1>{tr('شكراً لثقتكم باختيار تمرنا', 'Thank you for choosing Tamrna')}</h1>
-          <p>
-            {isRtl ? 'تم تسجيل طلبك رقم ' : 'Your order '}
-            <strong dir="ltr">{order.order_number}</strong>
-            {isRtl ? ' وسيتم تجهيز التمور بعناية فائقة ونقلها مبردة إلى عنوانك المعتمد.' : ' has been placed. Our packers are preparing your dates for chilled delivery.'}
-          </p>
+        <div className="order-success-wrapper">
+          {/* Main Success Hero Card */}
+          <div className="checkout-success-card order-success-hero">
+            <div className="order-success-badge-icon">
+              <Icon name="check" size={44} stroke={2.5} />
+            </div>
 
-          <dl>
-            <div><dt>{tr('رقم الطلب', 'Order #')}</dt><dd dir="ltr">{order.order_number}</dd></div>
-            {order.created_at ? <div><dt>{tr('تاريخ الطلب', 'Order date')}</dt><dd>{String(order.created_at).slice(0, 10)}</dd></div> : null}
-            <div><dt>{tr('طريقة الدفع', 'Payment method')}</dt><dd>{String(order.payment_method || '').toUpperCase()}</dd></div>
-            <div><dt>{tr('حالة الطلب', 'Order status')}</dt><dd>{tr('جاري التجهيز والشحن المبرد', 'Processing & cold shipping')}</dd></div>
-          </dl>
+            <div className="order-success-kicker">
+              <Icon name="sparkles" size={15} />
+              <span>{tr('تم تأكيد طلبك بنجاح', 'Order confirmed successfully')}</span>
+            </div>
 
-          <div className="checkout-success-actions">
-            <button type="button" className="button button--outline" onClick={() => window.print()}>{tr('طباعة الفاتورة', 'Print invoice')}</button>
-            <Link href="/catalog" className="button button--primary">{tr('متابعة التسوق', 'Continue shopping')}</Link>
+            <h1 className="order-success-title">{tr('شكراً لثقتكم باختيار تمرنا', 'Thank you for choosing Tamrna')}</h1>
+
+            <p className="order-success-desc">
+              {isRtl ? 'تم تسجيل وتأكيد طلبكم رقم ' : 'Your order '}
+              <button
+                type="button"
+                onClick={copyOrderNumber}
+                title={tr('انقر لنسخ رقم الطلب', 'Click to copy order #')}
+                className="order-number-pill"
+              >
+                <span dir="ltr">{order.order_number}</span>
+                <Icon name={copied ? 'check' : 'copy'} size={13} />
+                {copied && <span style={{ fontSize: '11px', color: '#b7e0cb' }}>{tr('تم النسخ', 'Copied')}</span>}
+              </button>
+              {isRtl
+                ? ' وسيتم تجهيز التمور الفاخرة بعناية فائقة ونقلها مبردة للحفاظ على جودتها.'
+                : ' has been placed. Our packers are preparing your dates for chilled luxury delivery.'}
+            </p>
+
+            {/* Quick 4 Stats Grid */}
+            <div className="order-stats-grid">
+              <div className="order-stat-box">
+                <span className="order-stat-label">
+                  <Icon name="hash" size={14} />
+                  <span>{tr('رقم الطلب', 'Order #')}</span>
+                </span>
+                <span className="order-stat-value" dir="ltr">{order.order_number}</span>
+              </div>
+
+              {order.created_at ? (
+                <div className="order-stat-box">
+                  <span className="order-stat-label">
+                    <Icon name="calendar" size={14} />
+                    <span>{tr('تاريخ الطلب', 'Order date')}</span>
+                  </span>
+                  <span className="order-stat-value">{String(order.created_at).slice(0, 10)}</span>
+                </div>
+              ) : null}
+
+              <div className="order-stat-box">
+                <span className="order-stat-label">
+                  <Icon name="credit-card" size={14} />
+                  <span>{tr('طريقة الدفع', 'Payment method')}</span>
+                </span>
+                <span className="order-stat-value">{paymentLabel}</span>
+              </div>
+
+              <div className="order-stat-box">
+                <span className="order-stat-label">
+                  <Icon name="truck" size={14} />
+                  <span>{tr('حالة الطلب', 'Order status')}</span>
+                </span>
+                <span className="order-stat-value" style={{ color: '#174a37' }}>
+                  {tr('جاري التجهيز والشحن', 'Processing & cold shipping')}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="checkout-card order-details-card" style={{ maxWidth: 850, margin: '28px auto 0' }}>
-          <h2>{tr('تفاصيل الطلب والشحن', 'Order & shipping details')}</h2>
-          <div className="checkout-delivery-summary" style={{ marginTop: 0 }}>
-            <small>{tr('بيانات المستلم والعنوان', 'Recipient & shipping address')}</small>
-            <strong>{order.customer_name} — <span dir="ltr">{order.customer_phone}</span></strong>
-            <span>{order.shipping_address}</span>
+          {/* 4-Step Order Tracker / Progress */}
+          <div className="order-tracker-card" data-no-print>
+            <h3 className="order-tracker-title">
+              <Icon name="package-check" size={18} />
+              <span>{tr('مسار تجهيز وشحن الطلب', 'Order fulfillment status')}</span>
+            </h3>
+
+            <ol className="order-tracker-steps">
+              <li className="order-tracker-step is-done">
+                <div className="order-tracker-step-circle">
+                  <Icon name="check" size={18} stroke={3} />
+                </div>
+                <span className="order-tracker-step-label">{tr('تم الاستلام', 'Received')}</span>
+              </li>
+
+              <li className="order-tracker-step is-current">
+                <div className="order-tracker-step-circle">
+                  <Icon name="package" size={18} />
+                </div>
+                <span className="order-tracker-step-label">{tr('جاري التجهيز والتغليف', 'Packaging')}</span>
+              </li>
+
+              <li className="order-tracker-step">
+                <div className="order-tracker-step-circle">
+                  <Icon name="truck" size={18} />
+                </div>
+                <span className="order-tracker-step-label">{tr('شحن مبرد', 'Chilled shipping')}</span>
+              </li>
+
+              <li className="order-tracker-step">
+                <div className="order-tracker-step-circle">
+                  <Icon name="home" size={18} />
+                </div>
+                <span className="order-tracker-step-label">{tr('تم التوصيل', 'Delivered')}</span>
+              </li>
+            </ol>
           </div>
 
-          <div className="checkout-items" style={{ borderTop: 0, marginTop: 0, paddingTop: 0 }}>
-            <h3>{tr('الأصناف المطلوبة', 'Ordered items')}</h3>
-            <ul className="account-lines">
-              {items.map((item) => {
-                const name = pickLang(item, 'product_name', locale, item.product_name);
-                let size = pickLang(item, 'size_name', locale, item.size_name || '');
-                if (!isRtl) size = String(size).replace(/كجم|كيلو/g, 'kg');
-                return (
-                  <li key={item.id}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={asset(item.featured_image || 'assets/images/home/ajwa.webp')} alt="" />
-                    <div><strong>{name}</strong><small>{size} × {item.quantity}</small></div>
-                    <strong>{money(item.subtotal)}</strong>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          {/* Unified Order & Shipping Details Card */}
+          <div className="checkout-card order-details-card order-details-card-modern">
+            <div className="order-section-header">
+              <h2 className="order-section-title">
+                <Icon name="clipboard-list" size={20} />
+                <span>{tr('تفاصيل الطلب والفاتورة', 'Order & invoice details')}</span>
+              </h2>
+            </div>
 
-          <div style={{ maxWidth: '20rem', marginInlineStart: 'auto', width: '100%' }}>
-            <div className="summary-row"><span>{tr('المجموع الفرعي', 'Subtotal')}</span><strong>{money(order.subtotal)}</strong></div>
-            {order.discount > 0 && <div className="summary-row summary-row--discount"><span>{tr('الخصم', 'Discount')}</span><strong>- {money(order.discount)}</strong></div>}
-            <div className="summary-row"><span>{tr('رسوم الشحن والتوصيل', 'Shipping fee')}</span><strong>{Number(order.shipping_fee) === 0 ? tr('مجاناً', 'FREE') : money(order.shipping_fee)}</strong></div>
-            <div className="summary-row summary-row--total"><span>{tr('الإجمالي المدفوع', 'Total amount')}</span><strong>{money(order.total)}</strong></div>
+            {/* Recipient & Shipping Address */}
+            <div className="order-shipping-block">
+              <div className="order-shipping-cell">
+                <span className="order-shipping-cell-label">
+                  <Icon name="user" size={14} />
+                  <span>{tr('بيانات المستلم', 'Recipient info')}</span>
+                </span>
+                <span className="order-shipping-cell-content">
+                  {order.customer_name || tr('عميل تمرنا', 'Tamrna customer')}
+                </span>
+                {order.customer_phone ? (
+                  <span className="order-shipping-cell-sub" dir="ltr">
+                    {order.customer_phone}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="order-shipping-cell">
+                <span className="order-shipping-cell-label">
+                  <Icon name="map-pin" size={14} />
+                  <span>{tr('عنوان التوصيل المعتمد', 'Delivery address')}</span>
+                </span>
+                <span className="order-shipping-cell-content">
+                  {order.shipping_address || (order.city ? `${order.city} - ${tr('توصيل منزلي', 'Home delivery')}` : tr('العنوان المعتمد للطلب', 'Registered address'))}
+                </span>
+                <span className="order-shipping-cell-sub" style={{ color: '#174a37', fontWeight: 600 }}>
+                  ❄️ {tr('نقل مبرد لضمان جودة وطزاجة التمور', 'Chilled transport to preserve premium date freshness')}
+                </span>
+              </div>
+            </div>
+
+            {/* Ordered Items List */}
+            <div className="order-items-wrapper">
+              <div className="order-section-header" style={{ marginBottom: '14px' }}>
+                <h3 className="order-section-title" style={{ fontSize: '15px' }}>
+                  <Icon name="boxes" size={16} />
+                  <span>{tr('الأصناف المطلوبة', 'Ordered items')} ({items.length})</span>
+                </h3>
+              </div>
+
+              <ul className="order-items-list">
+                {items.map((item) => {
+                  const name = pickLang(item, 'product_name', locale, item.product_name);
+                  let size = pickLang(item, 'size_name', locale, item.size_name || '');
+                  if (!isRtl) size = String(size).replace(/كجم|كيلو/g, 'kg');
+                  return (
+                    <li key={item.id} className="order-item-row">
+                      <div className="order-item-left">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={asset(item.featured_image || 'assets/images/home/ajwa.webp')}
+                          alt={name}
+                          className="order-item-thumb"
+                        />
+                        <div className="order-item-info">
+                          <strong className="order-item-name">{name}</strong>
+                          <span className="order-item-badge">
+                            {size ? `${size} × ` : ''}{item.quantity} {tr('عبوة', 'units')}
+                          </span>
+                        </div>
+                      </div>
+                      <strong className="order-item-price">{money(item.subtotal)}</strong>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {/* Financial Summary Block */}
+            <div className="order-summary-block">
+              <div className="order-summary-row">
+                <span>{tr('المجموع الفرعي', 'Subtotal')}</span>
+                <strong>{money(order.subtotal)}</strong>
+              </div>
+
+              {order.discount > 0 ? (
+                <div className="order-summary-row is-discount">
+                  <span>{tr('الخصم المطبق', 'Discount applied')}</span>
+                  <strong>- {money(order.discount)}</strong>
+                </div>
+              ) : null}
+
+              <div className="order-summary-row">
+                <span>{tr('رسوم الشحن والتوصيل المبرد', 'Chilled shipping fee')}</span>
+                {Number(order.shipping_fee) === 0 ? (
+                  <span className="order-free-chip">{tr('مجاناً', 'FREE')}</span>
+                ) : (
+                  <strong>{money(order.shipping_fee)}</strong>
+                )}
+              </div>
+
+              <div className="order-summary-divider" />
+
+              <div className="order-summary-row is-total">
+                <span>{tr('الإجمالي النهائي المدفوع', 'Total amount paid')}</span>
+                <strong>{money(order.total)}</strong>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="checkout-success-actions order-actions-footer">
+              <button
+                type="button"
+                className="order-btn-outline"
+                onClick={() => window.print()}
+              >
+                <Icon name="printer" size={18} />
+                <span>{tr('طباعة الفاتورة', 'Print invoice')}</span>
+              </button>
+
+              <Link href="/catalog" className="order-btn-primary">
+                <span>{tr('متابعة التسوق', 'Continue shopping')}</span>
+                <Icon name={isRtl ? 'arrow-left' : 'arrow-right'} size={18} />
+              </Link>
+            </div>
           </div>
         </div>
       </div>

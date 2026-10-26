@@ -5,6 +5,7 @@ import '../styles/legacy/foundation-auth.css';
 import '../styles/legacy/foundation-ext.css';
 import '../styles/legacy/foundation-select.css';
 import './globals.css';
+import '../styles/order-success.css';
 import '../styles/print.css'; // last: print rules must win over the screen styles above
 
 import { dirOf } from '@tamrna/shared/constants';
