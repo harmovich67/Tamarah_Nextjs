@@ -1,5 +1,6 @@
 import { apiClient as api } from '@/lib/apiClient';
 import { endpoints as e } from '../../endpoints';
+import { mapLimit } from '@/lib/imageCompress';
 import { packsFromGrams } from '@/lib/stock';
 import { toFormData, unwrap } from './helpers';
 import { fetchAll, fetchAllBilingual, fetchPage, isOn, listFilters, mediaList, mediaOf, slugPair, tx, txPair, uploadMedia, withFormErrors } from './tamrna';
@@ -235,14 +236,13 @@ async function productBody(values) {
   const slugs = values.slug_en || values.slug_ar ? { en: values.slug_en, ar: values.slug_ar } : slugPair({ name_en: values.name_en, name_ar: values.name_ar });
   const name_en = (values.name_en || '').trim() || values.name_ar;
   const existing = values.gallery_existing || [];
-  const gallery = [];
-  for (const item of values.gallery || []) {
-    if (item instanceof File) gallery.push(await uploadMedia(item, { model: 'Product', option: 'gallery' }));
-    else {
-      const kept = existing.find((m) => m.url === item);
-      if (kept?.id != null) gallery.push(kept.id);
-    }
-  }
+  // The pictures upload three at a time (in order of the gallery) instead of one after the other.
+  const gallery = (
+    await mapLimit(values.gallery || [], 3, async (item) => {
+      if (item instanceof File) return uploadMedia(item, { model: 'Product', option: 'gallery' });
+      return existing.find((m) => m.url === item)?.id ?? null;
+    })
+  ).filter((id) => id !== null && id !== undefined);
   // Keep an unavailable product unavailable; the form only knows "pre-order or not".
   const availability = values.is_preorder ? 'preorder' : values.availability && values.availability !== 'preorder' ? values.availability : 'available';
   const extras = values.extras || {};

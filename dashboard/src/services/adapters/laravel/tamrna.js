@@ -2,6 +2,7 @@ import { ApiError, ERROR_CODES } from '@tamrna/shared/api';
 import { slugify } from '@tamrna/shared/utils';
 import { apiClient as api, getAdminLocale } from '@/lib/apiClient';
 import { config } from '@/lib/config';
+import { compressImage } from '@/lib/imageCompress';
 import { endpoints as e } from '../../endpoints';
 import { toFormData, unwrap } from './helpers';
 
@@ -133,7 +134,10 @@ export async function fetchAllBilingual(path, params = {}) {
 
 /** Upload a File through /general/attachment and return its media id. */
 export async function uploadMedia(file, { model, option = 'image', type = 'image' }) {
-  const res = unwrap(await api.post(e.media.upload, toFormData({ media_type: type, option, model, file }), { headers: { user_type: 'admin' } }));
+  // Photos are scaled down first (lib/imageCompress.js) and the upload gets a longer timeout than a normal request (20 s): a
+  // few MB on a slow line takes longer than that, which showed "the request took too long" and left the product unsaved.
+  const body = toFormData({ media_type: type, option, model, file: type === 'image' ? await compressImage(file) : file });
+  const res = unwrap(await api.post(e.media.upload, body, { headers: { user_type: 'admin' }, timeoutMs: 180_000 }));
   const id = res?.id ?? res?.media?.id ?? res?.attachment?.id ?? res?.data?.id;
   if (id === undefined || id === null) {
     throw new ApiError({ status: 0, code: ERROR_CODES.HTTP, message: 'The upload endpoint did not return a media id', data: res });
