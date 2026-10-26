@@ -126,3 +126,5 @@ select:not([multiple]) {
   aside, header, .no-print { display: none !important; }
   main { overflow: visible !important; padding: 0 !important; }
 }
+
+/* Selects: the native arrow is hidden above so only the SVG chevron shows. */
