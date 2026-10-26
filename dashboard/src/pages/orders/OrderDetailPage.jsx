@@ -105,7 +105,6 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [overrideBranch, setOverrideBranch] = useState(null);
   const { register, reset, handleSubmit } = useForm({ defaultValues: { shipping_status: 'pending', payment_status: 'pending' } });
 
   useEffect(() => {
@@ -142,7 +141,7 @@ export default function OrderDetailPage() {
     order.shipping_type === 'home_delivery' ||
     order.delivery_type === 'delivery';
 
-  const detectedIsBranch = Boolean(
+  const isBranch = Boolean(
     !isDeliveryType && (
       order.is_branch === true ||
       order.shipping_type === 'branch_pickup' ||
@@ -158,7 +157,6 @@ export default function OrderDetailPage() {
     )
   );
 
-  const isBranch = overrideBranch !== null ? overrideBranch : detectedIsBranch;
   const currentStatus = order.shipping_status || 'pending';
   const nextStatus = getNextOrderStatus(currentStatus, isBranch ? 'branch_pickup' : 'delivery');
   const canCancel = canCancelOrder(currentStatus);
@@ -394,17 +392,7 @@ export default function OrderDetailPage() {
 
               {/* Current status display */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 block">{tr('الحالة الحالية للطلب:', 'Current status:')}</span>
-                  <button
-                    type="button"
-                    onClick={() => setOverrideBranch(!isBranch)}
-                    className="text-[11px] text-primary-700 hover:text-primary-800 font-bold underline transition"
-                    title={tr('تبديل وضع الاستلام يدوياً', 'Toggle fulfillment mode manually')}
-                  >
-                    {isBranch ? tr('تبديل إلى توصيل مبرد', 'Switch to delivery') : tr('تبديل إلى استلام من الفرع', 'Switch to branch pickup')}
-                  </button>
-                </div>
+                <span className="text-[11px] font-bold text-slate-400 block">{tr('الحالة الحالية للطلب:', 'Current status:')}</span>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={cx('text-xs font-black px-3 py-1 rounded-xl border inline-flex items-center gap-1.5', STATUS_BADGES[currentStatus] || STATUS_BADGES.pending)}>
                     <span className="w-2 h-2 rounded-full bg-current" />
