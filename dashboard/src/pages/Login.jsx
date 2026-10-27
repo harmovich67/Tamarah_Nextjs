@@ -119,18 +119,23 @@ export default function Login() {
                 {...register('password')}
               />
 
-              {config.apiMode !== 'laravel' && (
-                <button
-                  type="button"
-                  onClick={() => {
+              <button
+                type="button"
+                onClick={() => {
+                  if (config.apiMode === 'laravel') {
+                    setValue('identity', 'admin@info.com');
+                    setValue('password', '123456789');
+                  } else {
                     setValue('identity', 'admin@tumurna.com');
                     setValue('password', 'Admin@12345');
-                  }}
-                  className="w-full h-10 rounded-xl border border-slate-200/90 hover:border-slate-300 bg-slate-50/80 hover:bg-slate-100/80 text-slate-700 font-semibold text-xs transition active:scale-[0.98] shadow-2xs"
-                >
-                  {tr('تعبئة بيانات تجريبية (Admin Demo)', 'Fill demo details (Admin Demo)')}
-                </button>
-              )}
+                  }
+                }}
+                className="w-full h-10 rounded-xl border border-slate-200/90 hover:border-slate-300 bg-slate-50/80 hover:bg-slate-100/80 text-slate-700 font-semibold text-xs transition active:scale-[0.98] shadow-2xs"
+              >
+                {config.apiMode === 'laravel'
+                  ? tr('تعبئة بيانات الإدارة الحية (admin@info.com)', 'Fill live admin details (admin@info.com)')
+                  : tr('تعبئة بيانات تجريبية (Admin Demo)', 'Fill demo details (Admin Demo)')}
+              </button>
 
               <button
                 type="submit"
