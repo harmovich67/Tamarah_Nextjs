@@ -309,6 +309,9 @@ export async function getProduct(slug) {
   const { product, variants } = fromDetail(ar, en);
   product.slug = String(slug); // keep the URL the visitor came with (canonical stays stable)
   const { products } = await loadBase();
+  // The product answer lists only the gallery: a product whose picture was saved as its main image (no gallery) would show the
+  // static default here while its card shows the real one. The same row of the list gives the picture then.
+  if (!product.featured_image) product.featured_image = products.find((p) => String(p.id) === String(product.id))?.featured_image || '';
   const related = products.filter((p) => p.category_id === product.category_id && p.id !== product.id).slice(0, 4);
   return { product, variants, related };
 }
@@ -541,6 +544,16 @@ function guestToken() {
  * What the cart answer lacks for a line, read from the product detail: the picture (the cart sends `image: null`, the cards show
  * the first gallery picture) and, when the cart answers 0.00, the pack price.
  */
+/** Main picture of every product from the list answer (one light request, kept two minutes): for a product with no gallery. */
+const listImage = async (productId) => {
+  try {
+    const rows = await cached('list-images', 120_000, () => fetchAll('/client/products', {}, 'ar'));
+    return imageOf(rows.find((r) => String(r.id) === String(productId))?.image);
+  } catch {
+    return '';
+  }
+};
+
 async function lineDetail(productId, variantId) {
   if (!productId) return { image: '', price: 0, stock: null };
   try {
@@ -549,7 +562,8 @@ async function lineDetail(productId, variantId) {
     // The pack stock is real once the product keeps stock per pack (some pack reports more than 0); otherwise it is unknown.
     const tracked = (product.variants || []).some((v) => Number(v.stock) > 0);
     return {
-      image: (product.gallery || []).map(imageOf).find(Boolean) || imageOf(product.image),
+      // The same rule as the cards and the product page: the first gallery picture, else the product's main picture.
+      image: (product.gallery || []).map(imageOf).find(Boolean) || imageOf(product.image) || (await listImage(productId)),
       price: variant ? round2(variant.effective_price ?? variant.base_price ?? 0) : 0,
       stock: tracked && variant ? Number(variant.stock) || 0 : null,
     };

@@ -1,4 +1,4 @@
-import { safeStorage } from '@tamrna/shared/api';
+import { ApiError, ERROR_CODES, safeStorage } from '@tamrna/shared/api';
 import { getStoredUser } from '@/lib/session';
 import { api, form, localPhone, notFound, num, ORDER_STATUSES, PHONE_CODE, pick, requireUser, rowsOf, t, text, toOrder, toUser, unsupported, unwrap } from './http';
 
@@ -250,7 +250,17 @@ export async function cancelOrder() {
 /** `POST /client/reviews { order_id, rate, comment }` (an order can be reviewed once it is completed). */
 export async function submitReview({ orderId, rate, comment }) {
   requireUser();
-  await api.post('/client/reviews', form({ order_id: orderId, rate, comment }));
+  try {
+    await api.post('/client/reviews', form({ order_id: orderId, rate, comment }));
+  } catch (error) {
+    // Checked on the live server: a second review of the same order answers 404 "No query results for model [Order]" (the order is
+    // looked up among the ones still to review). That is "already reviewed", not a missing order.
+    if (error?.status === 404) {
+      const message = t('قيّمت هذا الطلب من قبل. شكراً لك!', 'You have already reviewed this order. Thank you!');
+      throw new ApiError({ status: 409, code: ERROR_CODES.CONFLICT, message, data: { success: false, message, already_reviewed: true } });
+    }
+    throw error;
+  }
   return { success: true };
 }
 

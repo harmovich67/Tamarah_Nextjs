@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toFriendlyMessage } from '@tamrna/shared/api';
+import { getOrderReview, rememberOrderReview } from '@/lib/orderReviews';
 import { Icon } from '@tamrna/shared/components/Icon';
 import { numberFormat } from '@tamrna/shared/utils';
 import { useLocale } from '@/components/LocaleProvider';
@@ -25,16 +26,37 @@ function ReviewForm({ order }) {
   const { locale, tr } = useLocale();
   const [rate, setRate] = useState(5);
   const [comment, setComment] = useState('');
-  const [sent, setSent] = useState(false);
+  // The review this browser already sent for the order (kept in lib/orderReviews.js): shown instead of the form, also after a refresh.
+  const [saved, setSaved] = useState({ ready: false, review: null });
+  useEffect(() => setSaved({ ready: true, review: getOrderReview(order.order_number) }), [order.order_number]);
   const send = useMutation({
     mutationFn: () => accountService.submitReview({ orderId: order.id, rate, comment: comment.trim() }),
     onSuccess: () => {
-      setSent(true);
+      const review = { rate, comment: comment.trim() };
+      rememberOrderReview(order.order_number, review);
+      setSaved({ ready: true, review });
       showToast(tr('شكراً لتقييمك!', 'Thank you for your review!'), 'success');
     },
-    onError: (e) => showToast(toFriendlyMessage(e, locale), 'error'),
+    onError: (e) => {
+      if (e?.data?.already_reviewed) {
+        rememberOrderReview(order.order_number, { rate: null, comment: '' });
+        setSaved({ ready: true, review: { rate: null, comment: '' } });
+      }
+      showToast(toFriendlyMessage(e, locale), e?.data?.already_reviewed ? 'info' : 'error');
+    },
   });
-  if (sent) return <Flash type="success">{tr('تم إرسال تقييمك. شكراً لك!', 'Your review was sent. Thank you!')}</Flash>;
+  if (!saved.ready) return null;
+  if (saved.review) {
+    const { rate: given, comment: text } = saved.review;
+    return (
+      <section className="account-card">
+        <header><span><Icon name="star" size={21} /></span><h2>{tr('تقييمك لهذا الطلب', 'Your review of this order')}</h2></header>
+        {given ? <p aria-label={`${given}/5`} style={{ color: '#b7791f', fontSize: 22, letterSpacing: 2, margin: '4px 0' }}>{'★'.repeat(given)}{'☆'.repeat(5 - given)}</p> : null}
+        {text ? <p>{text}</p> : null}
+        <Flash type="success">{given ? tr('تم إرسال تقييمك. شكراً لك!', 'Your review was sent. Thank you!') : tr('قيّمت هذا الطلب من قبل. شكراً لك!', 'You have already reviewed this order. Thank you!')}</Flash>
+      </section>
+    );
+  }
   return (
     <section className="account-card">
       <header><span><Icon name="star" size={21} /></span><h2>{tr('قيّم طلبك', 'Rate your order')}</h2></header>
@@ -46,8 +68,8 @@ function ReviewForm({ order }) {
           </select>
         </label>
         <label className="field">
-          <span>{tr('تعليقك', 'Your comment')}</span>
-          <textarea className="input" rows={3} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} />
+          <span>{tr('تعليقك', 'Your comment')} <b aria-hidden="true">*</b></span>
+          <textarea className="input" rows={3} maxLength={500} required value={comment} onChange={(e) => setComment(e.target.value)} />
         </label>
         <button type="submit" className="button button--primary" disabled={send.isPending}>{tr('إرسال التقييم', 'Send review')}</button>
       </form>
