@@ -131,9 +131,9 @@ export function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-/** Saudi mobile: 05xxxxxxxx, +9665xxxxxxxx, 9665xxxxxxxx, 5xxxxxxxx. */
+/** Saudi mobile: 05xxxxxxxx, +9665xxxxxxxx, 9665xxxxxxxx, 5xxxxxxxx (valid operator prefixes: 50, 53, 54, 55, 56, 57, 58, 59). */
 export function isSaudiMobile(value) {
-  return /^(\+?966|0)?5\d{8}$/.test(normalizeDigits(value).replace(/[\s-]+/g, ''));
+  return /^(\+?966|0)?5[03456789]\d{7}$/.test(normalizeDigits(value).replace(/[\s-]+/g, ''));
 }
 
 export function initialsOf(name) {

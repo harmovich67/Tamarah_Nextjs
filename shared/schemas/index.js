@@ -101,7 +101,7 @@ export const addressSchema = (locale = 'ar') => {
     phone: z
       .string()
       .trim()
-      .refine((v) => /^(05|5|\+9665|009665)[0-9]{8}$/.test(normalizeDigits(v).replace(/[^\d+]/g, '')), msg('يجب أن يبدأ الرقم بـ 05 ويتكون من 10 أرقام (مثال: 0555000000)', 'Must be a valid Saudi mobile starting with 05 (10 digits)')),
+      .refine((v) => /^(05|5|\+9665|009665)[03456789][0-9]{7}$/.test(normalizeDigits(v).replace(/[^\d+]/g, '')), msg('يجب أن يبدأ الرقم بـ 05 ويتكون من 10 أرقام صحيحة (مثال: 0555000000)', 'Must be a valid Saudi mobile starting with 05 (10 digits)')),
     city: z.string().min(1, msg('اختر المدينة', 'Choose a city')),
     street_address: z.string().trim().min(5, msg('يرجى كتابة اسم الحي والشارع بالتفصيل (مثال: حي الملقا، شارع أنس بن مالك)', 'Please provide detailed street and district')),
     building_floor: z.string().trim().optional().default(''),

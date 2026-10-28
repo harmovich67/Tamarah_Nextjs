@@ -7,7 +7,7 @@
  *
  * This file is only used by the mock adapters. It is never imported when API_MODE=laravel.
  */
-import raw from './seed.raw.json';
+import raw from './seed.raw.json' with { type: 'json' };
 import { adminSeed } from './seed.admin.js';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));

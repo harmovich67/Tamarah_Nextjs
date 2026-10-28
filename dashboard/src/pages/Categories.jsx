@@ -66,7 +66,7 @@ function CategoryDialog({ open, category, onClose }) {
       <form id="category-form" noValidate onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4 text-sm">
         <TextField label={tr('اسم التصنيف (بالعربية)', 'Category name (Arabic)')} required error={errors.name_ar?.message} placeholder={tr('مثال: عجوة فاخرة، سكري القصيم...', 'e.g. Luxury Ajwa, Qassim Sukkari…')} {...register('name_ar')} />
         <TextField label={tr('اسم التصنيف (بالإنجليزية)', 'Category name (English)')} dir="ltr" placeholder="e.g. Madinah Ajwa Luxury" {...register('name_en')} />
-        <Controller control={control} name="image_file" render={({ field }) => <FileUploader label={editing ? tr('تحديث صورة التصنيف', 'Update category image') : tr('صورة التصنيف', 'Category image')} value={field.value || (editing ? category.image : null) || undefined} onChange={field.onChange} />} />
+        <Controller control={control} name="image_file" render={({ field }) => <FileUploader label={editing ? tr('تحديث صورة التصنيف', 'Update category image') : tr('صورة التصنيف', 'Category image')} value={field.value || (editing ? category.image : null) || undefined} onChange={field.onChange} error={errors.image_file?.message} />} />
         {isLaravel ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
