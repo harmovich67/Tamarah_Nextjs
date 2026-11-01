@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { numberFormat, pickLang } from '@tamrna/shared/utils';
+import { numberFormat, pickLang, slugify } from '@tamrna/shared/utils';
 import { BTN, ConfirmDialog, DataTable, Icon, LinkButton, PageHeader, SearchInput, SelectField, cx } from '@/components/ui';
 import { useT } from '@/hooks/useT';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
@@ -11,6 +11,14 @@ import { storeService } from '@/services';
 import { config } from '@/lib/config';
 
 export const assetSrc = (p) => (!p ? '' : /^(https?:|data:)/.test(p) ? p : `/${String(p).replace(/^\//, '')}`);
+
+/** Storefront product URL matching the Next.js `web/app/product/[slug]` schema (`{id}-{slug}`). */
+export const productPreviewUrl = (p) => {
+  if (!p) return config.storefrontUrl;
+  const s = slugify(p.slug || p.name_en || p.name_ar || '');
+  const path = p.id ? (s ? `${p.id}-${s}` : String(p.id)) : s || String(p.id || '');
+  return `${config.storefrontUrl}/product/${path}`;
+};
 
 /** Products & inventory table (resources/views/admin/products.php). */
 export default function ProductsPage() {
@@ -49,7 +57,7 @@ export default function ProductsPage() {
             </span>
           )}
           <div>
-            <a href={`${config.storefrontUrl}/product/${p.slug}`} target="_blank" rel="noreferrer" className="hover:text-primary-700 transition font-black text-sm block">
+            <a href={productPreviewUrl(p)} target="_blank" rel="noreferrer" className="hover:text-primary-700 transition font-black text-sm block">
               {locale === 'en' && p.name_en ? p.name_en : p.name_ar}
             </a>
             {p.badge ? <span className="inline-block text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200/60 px-2 py-0.5 rounded-md mt-0.5">{p.badge}</span> : null}
@@ -114,7 +122,7 @@ export default function ProductsPage() {
       align: 'center',
       cell: (p) => (
         <div className="flex items-center justify-center gap-1.5">
-          <a href={`${config.storefrontUrl}/product/${p.slug}`} target="_blank" rel="noreferrer" className={BTN.icon} title={tr('معاينة بالمتجر', 'Preview')} aria-label={tr('معاينة بالمتجر', 'Preview')}>
+          <a href={productPreviewUrl(p)} target="_blank" rel="noreferrer" className={BTN.icon} title={tr('معاينة بالمتجر', 'Preview')} aria-label={tr('معاينة بالمتجر', 'Preview')}>
             <Icon name="eye" className="w-4 h-4" />
           </a>
           {can('products.edit') && (

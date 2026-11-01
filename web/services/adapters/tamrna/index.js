@@ -93,6 +93,7 @@ function baseProduct(ar, en) {
   return {
     id: ar.id,
     slug: slugFor(ar.id, ar.slug, ar.name),
+    raw_slug: ar.slug || '',
     status: 'published',
     name_ar: ar.name,
     name_en: en?.name || ar.name,
@@ -301,7 +302,22 @@ export async function getCatalog(params = {}) {
 
 /** @param {string|number} slug `13-slug` (or just the id) */
 export async function getProduct(slug) {
-  const id = idFromSlug(slug);
+  let id = idFromSlug(slug);
+  if (id === null) {
+    const raw = decodeURIComponent(String(slug ?? '')).trim();
+    const s = slugify(raw);
+    const { products } = await loadBase();
+    const match = products.find(
+      (p) =>
+        String(p.id) === raw ||
+        p.slug === raw ||
+        p.slug === `${p.id}-${s}` ||
+        (p.raw_slug && (p.raw_slug === raw || slugify(p.raw_slug) === s)) ||
+        slugify(p.name_en) === s ||
+        slugify(p.name_ar) === s
+    );
+    if (match) id = match.id;
+  }
   if (id === null) throw notFound(t('لا توجد منتجات مطابقة', 'No matching products'));
   // The product page asks twice (metadata + body): keep the answer for a few seconds.
   const [ar, en] = await cached(`detail:${id}`, 10_000, () => Promise.all([getData(`/client/products/${id}`, undefined, 'ar'), getData(`/client/products/${id}`, undefined, 'en').catch(() => null)]));
